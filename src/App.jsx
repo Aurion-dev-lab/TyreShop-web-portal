@@ -2,6 +2,8 @@ import React, { useState } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
+import ServiceLog from './pages/ServiceLog'
+import WorkersLog from './pages/WorkersLog'
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
@@ -27,6 +29,26 @@ function App() {
           element={
             isLoggedIn ? (
               <DashboardPage onLogout={handleLogout} />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          } 
+        />
+        <Route 
+          path="/service-log" 
+          element={
+            isLoggedIn ? (
+              <ServiceLog />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          } 
+        />
+        <Route 
+          path="/workers-log" 
+          element={
+            isLoggedIn ? (
+              <WorkersLog />
             ) : (
               <Navigate to="/login" replace />
             )
