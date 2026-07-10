@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   FiBox,
   FiCheckCircle,
@@ -13,8 +14,17 @@ import {
   FiCalendar,
 } from 'react-icons/fi'
 import { rangeOptions, categoryOptions, rangeMetrics } from '../data/metrics.jsx'
+import { useHelper } from '../context/helperContext.jsx'
+import * as XLSX from 'xlsx'
 
 const DashboardPage = ({ onLogout }) => {
+  const navigate = useNavigate()
+  const helperData = useHelper()
+
+  useEffect(() => {
+    console.log('Helper Context Data:', helperData)
+  }, [helperData])
+
   const [activeRange, setActiveRange] = useState('daily')
   const [activeCategory, setActiveCategory] = useState('all')
   const [isGenerating, setIsGenerating] = useState(false)
@@ -29,55 +39,125 @@ const DashboardPage = ({ onLogout }) => {
   )
 
   // Filtered Data Logic
-  const filteredServices = useMemo(() => {
-    return currentRangeData.servicesRows.filter(row => 
-      row.service.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-  }, [currentRangeData, searchQuery])
+  const { products = [], workers = [], salesInvoices = [], serviceInvoices = [], creditSales = [], isLoading } = helperData;
+
+  const inventoryRows = useMemo(() => {
+    return products.map(p => {
+      let trend = 'Healthy'
+      if (p.quantity <= p.minStock) trend = 'Low'
+      else if (p.quantity <= p.minStock * 1.5) trend = 'Normal'
+      return {
+        item: p.productName,
+        stock: p.quantity,
+        reorderAt: p.minStock,
+        trend
+      }
+    })
+  }, [products])
 
   const filteredInventory = useMemo(() => {
-    return currentRangeData.inventoryRows.filter(row => 
+    return inventoryRows.filter(row =>
       row.item.toLowerCase().includes(searchQuery.toLowerCase())
     )
-  }, [currentRangeData, searchQuery])
+  }, [inventoryRows, searchQuery])
+
+  const servicesRows = useMemo(() => {
+    const groups = serviceInvoices.reduce((acc, inv) => {
+      acc[inv.description] = (acc[inv.description] || 0) + 1
+      return acc
+    }, {})
+    return Object.keys(groups).map(desc => {
+      const count = groups[desc]
+      return {
+        service: desc,
+        count: count,
+        target: count + 5,
+        status: count > 2 ? 'Ahead' : 'Normal'
+      }
+    })
+  }, [serviceInvoices])
+
+  const filteredServices = useMemo(() => {
+    return servicesRows.filter(row =>
+      row.service.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+  }, [servicesRows, searchQuery])
+
+  const salaryRows = useMemo(() => {
+    const roles = workers.reduce((acc, w) => {
+      if (!acc[w.jobRole]) acc[w.jobRole] = { count: 0 }
+      acc[w.jobRole].count += 1
+      return acc
+    }, {})
+    return Object.keys(roles).map(role => ({
+      team: role,
+      paid: roles[role].count,
+      total: roles[role].count,
+      amount: 'Rs. ' + (roles[role].count * 50000).toLocaleString()
+    }))
+  }, [workers])
 
   const filteredSalary = useMemo(() => {
-    return currentRangeData.salaryRows.filter(row => 
+    return salaryRows.filter(row =>
       row.team.toLowerCase().includes(searchQuery.toLowerCase())
     )
-  }, [currentRangeData, searchQuery])
+  }, [salaryRows, searchQuery])
+
+  const dynamicStats = useMemo(() => {
+    const totalSalesRevenue = salesInvoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0) +
+      creditSales.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0)
+    const totalInventoryItems = products.reduce((sum, p) => sum + (p.quantity || 0), 0)
+
+    return {
+      services: {
+        value: serviceInvoices.length.toString(),
+        trend: 'Live updates',
+        trendType: 'up',
+        label: 'Total Services'
+      },
+      sales: {
+        value: `Rs. ${totalSalesRevenue.toLocaleString()}`,
+        trend: 'Live updates',
+        trendType: 'up',
+        label: 'Total Revenue'
+      },
+      inventory: {
+        value: totalInventoryItems.toString(),
+        trend: 'Live updates',
+        trendType: 'up',
+        label: 'Items in Stock'
+      },
+      salary: {
+        value: workers.length.toString(),
+        trend: 'Live updates',
+        trendType: 'up',
+        label: 'Total Employees'
+      }
+    }
+  }, [salesInvoices, creditSales, products, serviceInvoices, workers])
 
   const handleDownloadSaleReport = () => {
     setIsGenerating(true)
-    
-    const headers = ['Metric', 'Value', 'Status/Trend']
-    const statsRows = [
-      ['Services', currentRangeData.stats.services.value, currentRangeData.stats.services.trend],
-      ['Sales', currentRangeData.stats.sales.value, currentRangeData.stats.sales.trend],
-      ['Inventory', currentRangeData.stats.inventory.value, currentRangeData.stats.inventory.trend],
-      ['Salary', currentRangeData.stats.salary.value, currentRangeData.stats.salary.trend],
-    ]
-    
-    const csvContent = [
-      `TyreShop Sales Report - ${activeRangeLabel} View`,
-      `Generated on: ${new Date().toLocaleString()}`,
-      `Selection: ${activeRange === 'daily' ? selectedDate : activeRangeLabel}`,
-      `Search Filter: ${searchQuery || 'None'}`,
-      '',
-      headers.join(','),
-      ...statsRows.map(row => row.join(',')),
-    ].join('\n')
 
     setTimeout(() => {
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-      const link = document.createElement('a')
-      const url = URL.createObjectURL(blob)
-      link.setAttribute('href', url)
-      link.setAttribute('download', `TyreShop_Sales_${activeRangeLabel}_${new Date().toISOString().split('T')[0]}.csv`)
-      link.style.visibility = 'hidden'
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
+      const statsData = [
+        [`TyreShop Sales Report - ${activeRangeLabel} View`],
+        ['Generated on:', new Date().toLocaleString()],
+        ['Selection:', activeRange === 'daily' ? selectedDate : activeRangeLabel],
+        ['Search Filter:', searchQuery || 'None'],
+        [],
+        ['Metric', 'Value', 'Status/Trend'],
+        ['Services', dynamicStats.services.value, dynamicStats.services.trend],
+        ['Sales', dynamicStats.sales.value, dynamicStats.sales.trend],
+        ['Inventory', dynamicStats.inventory.value, dynamicStats.inventory.trend],
+        ['Salary', dynamicStats.salary.value, dynamicStats.salary.trend],
+      ]
+
+      const ws = XLSX.utils.aoa_to_sheet(statsData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Sales Report");
+
+      XLSX.writeFile(wb, `TyreShop_Sales_${activeRangeLabel}_${new Date().toISOString().split('T')[0]}.xlsx`);
       setIsGenerating(false)
     }, 1500)
   }
@@ -86,22 +166,22 @@ const DashboardPage = ({ onLogout }) => {
     {
       key: 'services',
       icon: <FiTool className="text-indigo-500" />,
-      ...currentRangeData.stats.services,
+      ...dynamicStats.services,
     },
     {
       key: 'sales',
       icon: <FiTrendingUp className="text-emerald-500" />,
-      ...currentRangeData.stats.sales,
+      ...dynamicStats.sales,
     },
     {
       key: 'inventory',
       icon: <FiBox className="text-amber-500" />,
-      ...currentRangeData.stats.inventory,
+      ...dynamicStats.inventory,
     },
     {
       key: 'salary',
       icon: <FiDollarSign className="text-rose-500" />,
-      ...currentRangeData.stats.salary,
+      ...dynamicStats.salary,
     },
   ]
 
@@ -181,21 +261,21 @@ const DashboardPage = ({ onLogout }) => {
                     key={range.key}
                     onClick={() => setActiveRange(range.key)}
                     className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${activeRange === range.key
-                        ? 'bg-white text-indigo-600 shadow-sm'
-                        : 'text-slate-400 hover:text-slate-600'
+                      ? 'bg-white text-indigo-600 shadow-sm'
+                      : 'text-slate-400 hover:text-slate-600'
                       }`}
                   >
                     {range.label}
                   </button>
                 ))}
               </div>
-              
+
               <div className="h-6 w-px bg-slate-200"></div>
 
               <div className="relative flex items-center gap-2 pr-2">
                 <FiCalendar className="text-slate-400 text-sm" />
-                <input 
-                  type="date" 
+                <input
+                  type="date"
                   value={selectedDate}
                   onChange={(e) => {
                     setSelectedDate(e.target.value)
@@ -206,7 +286,7 @@ const DashboardPage = ({ onLogout }) => {
               </div>
             </div>
 
-            <button 
+            <button
               onClick={handleDownloadSaleReport}
               disabled={isGenerating}
               className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl font-semibold text-sm hover:bg-indigo-600 hover:-translate-y-0.5 transition-all shadow-lg shadow-slate-200 disabled:bg-slate-400 disabled:translate-y-0"
@@ -233,8 +313,8 @@ const DashboardPage = ({ onLogout }) => {
               key={category.key}
               onClick={() => setActiveCategory(category.key)}
               className={`flex items-center gap-2.5 px-5 py-2.5 rounded-2xl whitespace-nowrap transition-all border shrink-0 ${activeCategory === category.key
-                  ? 'bg-white border-indigo-200 text-indigo-600 shadow-xl shadow-indigo-100 ring-4 ring-indigo-50'
-                  : 'bg-white border-slate-200 text-slate-500 hover:border-indigo-200 hover:text-indigo-500'
+                ? 'bg-white border-indigo-200 text-indigo-600 shadow-xl shadow-indigo-100 ring-4 ring-indigo-50'
+                : 'bg-white border-slate-200 text-slate-500 hover:border-indigo-200 hover:text-indigo-500'
                 }`}
             >
               <span className={`text-lg ${activeCategory === category.key ? 'text-indigo-600' : 'text-slate-400'}`}>
@@ -257,7 +337,7 @@ const DashboardPage = ({ onLogout }) => {
                   <span className="text-2xl">{card.icon}</span>
                 </div>
                 <div className={`flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full ${card.trendType === 'up' ? 'bg-emerald-50 text-emerald-600' :
-                    card.trendType === 'warning' ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-600'
+                  card.trendType === 'warning' ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-600'
                   }`}>
                   {card.trendType === 'up' && <FiTrendingUp />}
                   {card.trend}
@@ -299,7 +379,7 @@ const DashboardPage = ({ onLogout }) => {
                       </div>
                     </div>
                     <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${row.status === 'Ahead' ? 'bg-emerald-100 text-emerald-700' :
-                        row.status === 'Attention' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'
+                      row.status === 'Attention' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'
                       }`}>
                       {row.status}
                     </div>
@@ -308,11 +388,12 @@ const DashboardPage = ({ onLogout }) => {
                   <div className="p-10 text-center text-slate-400 text-sm font-medium">No matching services found.</div>
                 )}
               </div>
-              <button className="w-full p-4 text-sm font-semibold text-indigo-600 hover:bg-indigo-50 transition-colors flex items-center justify-center gap-2 border-t border-slate-100">
+              <button onClick={() => navigate('/service-log')} className="w-full p-4 text-sm font-semibold text-indigo-600 hover:bg-indigo-50 transition-colors flex items-center justify-center gap-2 border-t border-slate-100 cursor-pointer">
                 View Full Service Log <FiChevronRight />
               </button>
             </div>
           )}
+
 
           {/* Sales Chart */}
           {(activeCategory === 'all' || activeCategory === 'sales') && (
@@ -327,25 +408,96 @@ const DashboardPage = ({ onLogout }) => {
                   <p className="text-[10px] text-emerald-600 font-bold uppercase">Total {currentRangeData.salesLabel}</p>
                 </div>
               </div>
-              <div className="flex-1 p-8 flex items-end justify-between gap-3 min-h-[240px]">
-                {currentRangeData.salesByPeriod.map((value, index) => (
-                  <div key={index} className="flex-1 flex flex-col items-center gap-3 group">
-                    <div className="w-full relative h-full flex flex-col justify-end">
-                      <div
-                        style={{ height: `${value}%` }}
-                        className="w-full bg-slate-100 rounded-t-xl group-hover:bg-indigo-500 transition-all duration-500 relative"
-                      >
-                        <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity">
-                          {value}%
-                        </div>
-                      </div>
-                    </div>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
-                      {currentRangeData.salesLabel === 'Hourly' ? `H${index + 1}` :
-                        currentRangeData.salesLabel === 'Daily' ? `D${index + 1}` : `W${index + 1}`}
-                    </span>
-                  </div>
-                ))}
+              <div className="flex-1 p-8 min-h-[240px]">
+                {(() => {
+                  const data = currentRangeData.salesByPeriod
+                  const width = 600
+                  const height = 200
+                  const padding = 20
+                  const stepX = (width - padding * 2) / (data.length - 1 || 1)
+
+                  const points = data.map((value, index) => ({
+                    x: padding + index * stepX,
+                    y: height - padding - (value / 100) * (height - padding * 2),
+                    value,
+                    index,
+                  }))
+
+                  const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ')
+                  const areaPath = `${linePath} L ${points[points.length - 1].x} ${height - padding} L ${points[0].x} ${height - padding} Z`
+
+                  const labelFor = (index) =>
+                    currentRangeData.salesLabel === 'Hourly' ? `H${index + 1}` :
+                      currentRangeData.salesLabel === 'Daily' ? `D${index + 1}` : `W${index + 1}`
+
+                  return (
+                    <svg viewBox={`0 0 ${width} ${height + 30}`} className="w-full h-full overflow-visible">
+                      <defs>
+                        <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#6366f1" stopOpacity="0.25" />
+                          <stop offset="100%" stopColor="#6366f1" stopOpacity="0" />
+                        </linearGradient>
+                      </defs>
+
+                      {/* Gridlines */}
+                      {[0, 25, 50, 75, 100].map((g) => (
+                        <line
+                          key={g}
+                          x1={padding}
+                          x2={width - padding}
+                          y1={height - padding - (g / 100) * (height - padding * 2)}
+                          y2={height - padding - (g / 100) * (height - padding * 2)}
+                          stroke="#f1f5f9"
+                          strokeWidth="1"
+                        />
+                      ))}
+
+                      {/* Area fill */}
+                      <path d={areaPath} fill="url(#salesGradient)" />
+
+                      {/* Line */}
+                      <path
+                        d={linePath}
+                        fill="none"
+                        stroke="#6366f1"
+                        strokeWidth="3"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+
+                      {/* Points, x-axis labels, tooltips */}
+                      {points.map((p) => (
+                        <g key={p.index} className="group cursor-pointer">
+                          {/* invisible hit area for easier hover */}
+                          <circle cx={p.x} cy={p.y} r="12" fill="transparent" />
+                          <circle
+                            cx={p.x}
+                            cy={p.y}
+                            r="4"
+                            fill="white"
+                            stroke="#6366f1"
+                            strokeWidth="2.5"
+                            className="transition-all"
+                          />
+                          <text
+                            x={p.x}
+                            y={height + 20}
+                            textAnchor="middle"
+                            className="fill-slate-400 text-[9px] font-bold uppercase"
+                          >
+                            {labelFor(p.index)}
+                          </text>
+                          <g className="opacity-0 group-hover:opacity-100 transition-opacity">
+                            <rect x={p.x - 18} y={p.y - 32} width="36" height="20" rx="5" fill="#0f172a" />
+                            <text x={p.x} y={p.y - 18} textAnchor="middle" className="fill-white text-[10px] font-bold">
+                              {p.value}%
+                            </text>
+                          </g>
+                        </g>
+                      ))}
+                    </svg>
+                  )
+                })()}
               </div>
             </div>
           )}
@@ -386,7 +538,7 @@ const DashboardPage = ({ onLogout }) => {
                           </td>
                           <td className="px-4 py-4 text-right">
                             <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${row.trend === 'Low' ? 'bg-rose-50 text-rose-600' :
-                                row.trend === 'Healthy' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-600'
+                              row.trend === 'Healthy' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-600'
                               }`}>
                               {row.trend}
                             </span>
@@ -440,7 +592,7 @@ const DashboardPage = ({ onLogout }) => {
                   <FiCheckCircle className="text-indigo-200" />
                   <span className="text-xs font-bold uppercase tracking-wider">{currentRangeData.salaryFooter}</span>
                 </div>
-                <button className="text-[10px] font-black uppercase tracking-widest bg-white/20 px-3 py-1.5 rounded hover:bg-white/30 transition-colors">
+                <button onClick={() => navigate('/workers-log')} className="text-[10px] font-black uppercase tracking-widest bg-white/20 px-3 py-1.5 rounded hover:bg-white/30 transition-colors cursor-pointer">
                   Details
                 </button>
               </div>
