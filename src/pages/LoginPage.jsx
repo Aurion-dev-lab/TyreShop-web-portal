@@ -1,11 +1,9 @@
 import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { FiTool, FiUser, FiLock, FiArrowRight, FiAlertCircle } from 'react-icons/fi'
 import { useAuth } from '../context/AuthContext'
 
 const LoginPage = () => {
   const { login } = useAuth()
-  const navigate = useNavigate()
   const [userName, setUserName] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
