@@ -16,14 +16,12 @@ import {
 import { rangeOptions, categoryOptions, rangeMetrics } from '../data/metrics.jsx'
 import { useHelper } from '../context/helperContext.jsx'
 import * as XLSX from 'xlsx'
+import { useAuth } from '../context/AuthContext.jsx'
 
 const DashboardPage = ({ onLogout }) => {
   const navigate = useNavigate()
   const helperData = useHelper()
-
-  useEffect(() => {
-    console.log('Helper Context Data:', helperData)
-  }, [helperData])
+  const {logout} = useAuth()
 
   const [activeRange, setActiveRange] = useState('daily')
   const [activeCategory, setActiveCategory] = useState('all')
@@ -38,7 +36,6 @@ const DashboardPage = ({ onLogout }) => {
     [activeRange],
   )
 
-  // Filtered Data Logic
   const { products = [], workers = [], salesInvoices = [], serviceInvoices = [], creditSales = [], isLoading } = helperData;
 
   const inventoryRows = useMemo(() => {
@@ -192,7 +189,6 @@ const DashboardPage = ({ onLogout }) => {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans selection:bg-indigo-100">
-      {/* Top Navbar */}
       <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
@@ -227,7 +223,7 @@ const DashboardPage = ({ onLogout }) => {
                   </div>
                   <div className="hidden lg:block">
                     <p className="text-sm font-semibold text-slate-700 group-hover:text-rose-600 transition-colors">Admin Portal</p>
-                    <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">Sign Out</p>
+                    <button className="text-[10px] text-slate-500 font-medium uppercase tracking-wider" onClick={logout}>Sign Out</button>
                   </div>
                 </div>
               </div>
@@ -237,7 +233,6 @@ const DashboardPage = ({ onLogout }) => {
       </nav>
 
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header Section */}
         <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-8">
           <div>
             <div className="flex items-center gap-2 mb-2">
@@ -306,7 +301,6 @@ const DashboardPage = ({ onLogout }) => {
           </div>
         </div>
 
-        {/* Category Filter Pills */}
         <div className="flex overflow-x-auto pb-4 mb-8 no-scrollbar gap-2">
           {categoryOptions.map((category) => (
             <button
@@ -325,7 +319,6 @@ const DashboardPage = ({ onLogout }) => {
           ))}
         </div>
 
-        {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {visibleStats.map((card) => (
             <div
@@ -349,10 +342,8 @@ const DashboardPage = ({ onLogout }) => {
           ))}
         </div>
 
-        {/* Details Grid */}
         <div className={`grid grid-cols-1 lg:grid-cols-2 gap-8 ${activeCategory !== 'all' ? 'lg:grid-cols-1' : ''}`}>
 
-          {/* Services Tracker */}
           {(activeCategory === 'all' || activeCategory === 'services') && (
             <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
               <div className="p-6 border-b border-slate-100 flex items-center justify-between">
@@ -395,7 +386,6 @@ const DashboardPage = ({ onLogout }) => {
           )}
 
 
-          {/* Sales Chart */}
           {(activeCategory === 'all' || activeCategory === 'sales') && (
             <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
               <div className="p-6 border-b border-slate-100 flex items-center justify-between">
@@ -439,7 +429,6 @@ const DashboardPage = ({ onLogout }) => {
                         </linearGradient>
                       </defs>
 
-                      {/* Gridlines */}
                       {[0, 25, 50, 75, 100].map((g) => (
                         <line
                           key={g}
@@ -452,10 +441,8 @@ const DashboardPage = ({ onLogout }) => {
                         />
                       ))}
 
-                      {/* Area fill */}
                       <path d={areaPath} fill="url(#salesGradient)" />
 
-                      {/* Line */}
                       <path
                         d={linePath}
                         fill="none"
@@ -465,10 +452,8 @@ const DashboardPage = ({ onLogout }) => {
                         strokeLinejoin="round"
                       />
 
-                      {/* Points, x-axis labels, tooltips */}
                       {points.map((p) => (
                         <g key={p.index} className="group cursor-pointer">
-                          {/* invisible hit area for easier hover */}
                           <circle cx={p.x} cy={p.y} r="12" fill="transparent" />
                           <circle
                             cx={p.x}
@@ -502,7 +487,6 @@ const DashboardPage = ({ onLogout }) => {
             </div>
           )}
 
-          {/* Inventory Health */}
           {(activeCategory === 'all' || activeCategory === 'inventory') && (
             <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
               <div className="p-6 border-b border-slate-100 flex items-center justify-between">
@@ -556,7 +540,6 @@ const DashboardPage = ({ onLogout }) => {
             </div>
           )}
 
-          {/* Payroll Progress */}
           {(activeCategory === 'all' || activeCategory === 'salary') && (
             <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
               <div className="p-6 border-b border-slate-100">
@@ -601,7 +584,6 @@ const DashboardPage = ({ onLogout }) => {
         </div>
       </main>
 
-      {/* Mobile Bottom Nav */}
       <nav className="md:hidden sticky bottom-0 z-50 bg-white border-t border-slate-200 flex items-center justify-around p-3 pb-6">
         {categoryOptions.slice(1).map((category) => (
           <button

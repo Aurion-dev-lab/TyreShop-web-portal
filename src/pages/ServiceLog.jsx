@@ -10,7 +10,6 @@ const ServiceLog = () => {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans selection:bg-indigo-100 p-4 sm:p-8">
       <div className="max-w-7xl mx-auto w-full">
-        {/* Header */}
         <div className="flex items-center gap-4 mb-8">
           <button 
             onClick={() => navigate(-1)}
@@ -26,7 +25,6 @@ const ServiceLog = () => {
           </div>
         </div>
 
-        {/* Content */}
         <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
           {isLoading ? (
             <div className="p-12 text-center text-slate-500 font-medium">Loading service details...</div>
