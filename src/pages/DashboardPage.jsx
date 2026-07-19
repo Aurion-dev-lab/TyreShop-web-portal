@@ -101,8 +101,8 @@ const DashboardPage = ({ onLogout }) => {
   }, [salaryRows, searchQuery])
 
   const dynamicStats = useMemo(() => {
-    const totalSalesRevenue = salesInvoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0) +
-      creditSales.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0)
+    const totalSalesRevenue = salesInvoices.reduce((sum, inv) => sum + (inv.grandTotal || 0), 0) +
+      creditSales.reduce((sum, inv) => sum + (inv.amount || 0), 0)
     const totalInventoryItems = products.reduce((sum, p) => sum + (p.quantity || 0), 0)
 
     return {
@@ -394,8 +394,8 @@ const DashboardPage = ({ onLogout }) => {
                   <p className="text-sm text-slate-500">Gross collections breakdown</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-2xl font-black text-slate-900">{currentRangeData.salesValue}</p>
-                  <p className="text-[10px] text-emerald-600 font-bold uppercase">Total {currentRangeData.salesLabel}</p>
+                  <p className="text-2xl font-black text-slate-900">{dynamicStats.sales.value}</p>
+                  <p className="text-[10px] text-emerald-600 font-bold uppercase">Total Revenue</p>
                 </div>
               </div>
               <div className="flex-1 p-8 min-h-[240px]">
@@ -573,7 +573,7 @@ const DashboardPage = ({ onLogout }) => {
               <div className="mt-auto p-4 bg-indigo-600 text-white flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <FiCheckCircle className="text-indigo-200" />
-                  <span className="text-xs font-bold uppercase tracking-wider">{currentRangeData.salaryFooter}</span>
+                  <span className="text-xs font-bold uppercase tracking-wider">{workers.length} of {workers.length} salaries released</span>
                 </div>
                 <button onClick={() => navigate('/workers-log')} className="text-[10px] font-black uppercase tracking-widest bg-white/20 px-3 py-1.5 rounded hover:bg-white/30 transition-colors cursor-pointer">
                   Details

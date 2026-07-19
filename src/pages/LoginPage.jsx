@@ -14,7 +14,7 @@ const LoginPage = () => {
     setError('')
     setIsLoading(true)
     try {
-      await login({ userName, password })
+      await login({ user_name: userName, password })
       window.location.href = '/dashboard'
     } catch (err) {
       setError(err.response?.data?.message || 'Invalid credentialsss')
