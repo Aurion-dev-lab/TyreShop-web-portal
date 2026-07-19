@@ -1,0 +1,248 @@
+import React, { useState, useMemo } from 'react';
+import { useHelper } from '../context/helperContext.jsx';
+import api from '../api/api.js';
+import {
+  FiCheck,
+  FiSlash,
+  FiX,
+  FiUserPlus,
+  FiCalendar,
+  FiSearch,
+  FiTrash2,
+  FiUsers
+} from 'react-icons/fi';
+
+const WorkersPage = () => {
+  const { workers, attendances, fetchAllData, isLoading } = useHelper();
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().substring(0, 7)); // YYYY-MM
+  const [historySearch, setHistorySearch] = useState('');
+  const [historyFrom, setHistoryFrom] = useState(
+    new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  );
+  const [historyTo, setHistoryTo] = useState(new Date().toISOString().split('T')[0]);
+
+  // Attendance for the selected date
+  const selectedDateAttendances = useMemo(() => {
+    return attendances.filter(a => a.attendance_date === selectedDate);
+  }, [attendances, selectedDate]);
+
+  // Filtered attendance history
+  const filteredHistory = useMemo(() => {
+    return attendances
+      .filter(a => {
+        const dateMatch = a.attendance_date >= historyFrom && a.attendance_date <= historyTo;
+        const workerName = workers.find(w => w.id === a.worker_id || w.workerId === a.worker_id)?.name || '';
+        const searchMatch = workerName.toLowerCase().includes(historySearch.toLowerCase());
+        return dateMatch && searchMatch;
+      })
+      .sort((a, b) => b.attendance_date.localeCompare(a.attendance_date));
+  }, [attendances, workers, historyFrom, historyTo, historySearch]);
+
+  // Monthly summary calculations
+  const monthlySummary = useMemo(() => {
+    const monthAttendances = attendances.filter(a => a.attendance_date.startsWith(selectedMonth));
+    return workers.map(worker => {
+      const wAttendances = monthAttendances.filter(a => a.worker_id === worker.id || a.worker_id === worker.workerId);
+      let presentCount = 0;
+      let halfDayCount = 0;
+      wAttendances.forEach(a => {
+        if (a.status === 'PRESENT') presentCount++;
+        else if (a.status === 'HALF_DAY') halfDayCount++;
+      });
+      const days = presentCount + halfDayCount * 0.5;
+      const rate = worker.rate || 0;
+      const netPayable = days * rate;
+
+      return {
+        workerId: worker.id || worker.workerId,
+        name: worker.name,
+        days,
+        netPayable
+      };
+    });
+  }, [workers, attendances, selectedMonth]);
+
+  return (
+    <div className="space-y-8">
+      {/* Page Title */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-3">
+            <FiUsers className="text-emerald-500" /> Worker Management
+          </h1>
+          <p className="text-slate-500 mt-1 text-sm font-medium">Manage your team and track daily attendance</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Main Columns */}
+        <div className="lg:col-span-2 space-y-8">
+          {/* Daily Attendance Card */}
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Daily Attendance - {selectedDate}</h3>
+                <p className="text-xs text-slate-500">View worker status for today</p>
+              </div>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="px-3 py-1.5 border border-slate-200 rounded-xl text-sm font-semibold outline-none cursor-pointer"
+              />
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-200">
+                    <th className="px-6 py-4">Worker</th>
+                    <th className="px-6 py-4">Daily Rate</th>
+                    <th className="px-6 py-4 text-right">Attendance Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {workers.map((worker) => {
+                    const id = worker.id || worker.workerId;
+                    const attendance = selectedDateAttendances.find(a => a.worker_id === id);
+                    const status = attendance?.status || 'NOT MARKED';
+
+                    return (
+                      <tr key={id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-6 py-4">
+                          <p className="font-bold text-slate-800 text-sm">{worker.name}</p>
+                          <p className="text-xs text-slate-500 font-medium">{worker.jobRole}</p>
+                        </td>
+                        <td className="px-6 py-4 text-sm font-semibold text-slate-600">
+                          Rs. {worker.rate?.toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
+                            status === 'PRESENT' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
+                            status === 'HALF_DAY' ? 'bg-amber-50 text-amber-600 border border-amber-100' :
+                            status === 'ABSENT' ? 'bg-rose-50 text-rose-600 border border-rose-100' :
+                            'bg-slate-100 text-slate-400'
+                          }`}>
+                            {status}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Attendance History Card */}
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-6 border-b border-slate-100 space-y-4">
+              <h3 className="text-lg font-bold text-slate-900">Attendance History</h3>
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="relative flex-1 min-w-[200px]">
+                  <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={historySearch}
+                    onChange={(e) => setHistorySearch(e.target.value)}
+                    placeholder="Search worker..."
+                    className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all outline-none w-full"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="date"
+                    value={historyFrom}
+                    onChange={(e) => setHistoryFrom(e.target.value)}
+                    className="px-3 py-1.5 border border-slate-200 rounded-xl text-xs font-semibold outline-none cursor-pointer"
+                  />
+                  <span className="text-slate-400 text-xs">to</span>
+                  <input
+                    type="date"
+                    value={historyTo}
+                    onChange={(e) => setHistoryTo(e.target.value)}
+                    className="px-3 py-1.5 border border-slate-200 rounded-xl text-xs font-semibold outline-none cursor-pointer"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="max-h-[350px] overflow-y-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-200 sticky top-0">
+                    <th className="px-6 py-3">Date</th>
+                    <th className="px-6 py-3">Worker</th>
+                    <th className="px-6 py-3 text-right">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredHistory.map((att) => {
+                    const worker = workers.find(w => w.id === att.worker_id || w.workerId === att.worker_id);
+                    return (
+                      <tr key={att.id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-6 py-3 text-sm text-slate-500 font-mono">
+                          {att.attendance_date}
+                        </td>
+                        <td className="px-6 py-3 text-sm font-semibold text-slate-800">
+                          {worker?.name || 'Unknown Worker'}
+                        </td>
+                        <td className="px-6 py-3 text-right">
+                          <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
+                            att.status === 'PRESENT' ? 'bg-emerald-50 text-emerald-600' :
+                            att.status === 'HALF_DAY' ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-600'
+                          }`}>
+                            {att.status}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {filteredHistory.length === 0 && (
+                    <tr>
+                      <td colSpan="3" className="p-8 text-center text-slate-400 text-sm font-medium">
+                        No history records found.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        {/* Sidebar Summary Column */}
+        <div className="bg-[#1e2530] text-white rounded-3xl p-6 shadow-sm border border-slate-800 space-y-6">
+          <div className="flex justify-between items-center border-b border-slate-800 pb-4">
+            <div>
+              <h3 className="text-lg font-bold">Monthly Summary</h3>
+              <p className="text-xs text-slate-400">Current payouts calculated</p>
+            </div>
+            <input
+              type="month"
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="bg-slate-800 border border-slate-700 text-white rounded-xl px-2 py-1 text-xs font-semibold cursor-pointer outline-none"
+            />
+          </div>
+
+          <div className="space-y-4">
+            {monthlySummary.map((sum) => (
+              <div key={sum.workerId} className="flex justify-between items-center p-3 bg-slate-800/40 rounded-2xl border border-slate-800/80">
+                <div>
+                  <p className="font-bold text-sm text-slate-200">{sum.name}</p>
+                  <p className="text-xs text-slate-400">{sum.days} DAYS</p>
+                </div>
+                <div className="text-right">
+                  <p className="font-bold text-sm text-emerald-400">Rs. {sum.netPayable?.toLocaleString()}</p>
+                  <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Gross Payable</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default WorkersPage;

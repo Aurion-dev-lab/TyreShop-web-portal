@@ -1,16 +1,16 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
-import { 
-  getProducts, 
+import {
+  getProducts,
   getProductImages,
-  getWorkers, 
-  getAttendances, 
+  getWorkers,
+  getAttendances,
   getWorkerCredits,
   getSalaryPayments,
   getSalaryAdvances,
-  getCreditSales, 
+  getCreditSales,
   getCreditSaleParts,
-  getExportRecords, 
-  getServiceInvoices, 
+  getExportRecords,
+  getServiceInvoices,
   getQuickServices,
   getQuickServicePresets,
   getSalesInvoices,
@@ -90,11 +90,11 @@ export const HelperProvider = ({ children }) => {
           ...p,
           productName: p.name,
           quantity: p.stock,
-          minStock: p.minimumStockAlert || 5,
+          minStock: p.minimum_stock_alert || 5,
         }));
         setProducts(mappedProducts);
       }
-      
+
       if (workersRes?.data?.status === 'success') {
         const mappedWorkers = (workersRes.data.data || []).map(w => ({
           ...w,
@@ -102,11 +102,12 @@ export const HelperProvider = ({ children }) => {
           name: w.name,
           jobRole: w.role,
           telephone: w.phone,
-          salaryType: w.salaryType || 'Monthly',
+          salaryType: w.salary_type || 'Monthly',
+          rate: w.rate ? parseFloat(w.rate) : 0,
         }));
         setWorkers(mappedWorkers);
       }
-      
+
       if (attendancesRes?.data?.status === 'success') setAttendances(attendancesRes.data.data || []);
       if (productImagesRes?.data?.status === 'success') setProductImages(productImagesRes.data.data || []);
       if (workerCreditsRes?.data?.status === 'success') setWorkerCredits(workerCreditsRes.data.data || []);
@@ -115,18 +116,25 @@ export const HelperProvider = ({ children }) => {
       if (creditSalesRes?.data?.status === 'success') setCreditSales(creditSalesRes.data.data || []);
       if (creditSalePartsRes?.data?.status === 'success') setCreditSaleParts(creditSalePartsRes.data.data || []);
       if (exportRecordsRes?.data?.status === 'success') setExportRecords(exportRecordsRes.data.data || []);
-      if (salesInvoicesRes?.data?.status === 'success') setSalesInvoices(salesInvoicesRes.data.data || []);
+
+      if (salesInvoicesRes?.data?.status === 'success') {
+        const mappedInvoices = (salesInvoicesRes.data.data || []).map(inv => ({
+          ...inv,
+          grandTotal: inv.grand_total
+        }));
+        setSalesInvoices(mappedInvoices);
+      }
       if (invoiceLineItemsRes?.data?.status === 'success') setInvoiceLineItems(invoiceLineItemsRes.data.data || []);
       if (quickServicesRes?.data?.status === 'success') setQuickServices(quickServicesRes.data.data || []);
       if (quickServicePresetsRes?.data?.status === 'success') setQuickServicePresets(quickServicePresetsRes.data.data || []);
       if (customersRes?.data?.status === 'success') setCustomers(customersRes.data.data || []);
       if (expensesRes?.data?.status === 'success') setExpenses(expensesRes.data.data || []);
-      
+
       if (serviceInvoicesRes?.data?.status === 'success') {
         const mappedServices = (serviceInvoicesRes.data.data || []).map(s => ({
           ...s,
           invoiceNumber: s.id ? s.id.substring(0, 8).toUpperCase() : 'SRV-000',
-          createdAt: s.serviceDate ? s.serviceDate + "T00:00:00" : new Date().toISOString(),
+          createdAt: s.service_date ? s.service_date + "T00:00:00" : new Date().toISOString(),
           customerName: s.remark || 'Walk-in Customer',
           phoneNumber: 'N/A',
           vehicleNumber: 'N/A',
@@ -151,27 +159,27 @@ export const HelperProvider = ({ children }) => {
   }, []);
 
   return (
-    <HelperContext.Provider value={{ 
-      products, 
+    <HelperContext.Provider value={{
+      products,
       productImages,
-      workers, 
-      attendances, 
+      workers,
+      attendances,
       workerCredits,
       salaryPayments,
       salaryAdvances,
-      creditSales, 
+      creditSales,
       creditSaleParts,
-      exportRecords, 
-      salesInvoices, 
+      exportRecords,
+      salesInvoices,
       invoiceLineItems,
       serviceInvoices,
       quickServices,
       quickServicePresets,
       customers,
       expenses,
-      isLoading, 
-      error, 
-      fetchAllData 
+      isLoading,
+      error,
+      fetchAllData
     }}>
       {children}
     </HelperContext.Provider>

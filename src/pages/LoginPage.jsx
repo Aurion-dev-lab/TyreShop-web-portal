@@ -70,9 +70,8 @@ const LoginPage = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className={`w-full pl-12 pr-4 py-3.5 bg-slate-50 border-2 rounded-2xl focus:bg-white transition-all outline-none text-slate-700 font-medium ${
-                    error ? 'border-rose-500 focus:border-rose-500' : 'border-transparent focus:border-indigo-500'
-                  }`}
+                  className={`w-full pl-12 pr-4 py-3.5 bg-slate-50 border-2 rounded-2xl focus:bg-white transition-all outline-none text-slate-700 font-medium ${error ? 'border-rose-500 focus:border-rose-500' : 'border-transparent focus:border-indigo-500'
+                    }`}
                 />
               </div>
               {error && (
