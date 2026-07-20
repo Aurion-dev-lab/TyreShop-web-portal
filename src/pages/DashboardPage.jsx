@@ -21,34 +21,44 @@ import { useAuth } from '../context/AuthContext.jsx'
 const DashboardPage = ({ onLogout }) => {
   const navigate = useNavigate()
   const helperData = useHelper()
-  const {logout} = useAuth()
+  const { logout } = useAuth()
 
-  const [activeRange, setActiveRange] = useState('daily')
+  const [startDate, setStartDate] = useState('2026-07-13')
+  const [endDate, setEndDate] = useState('2026-07-20')
   const [activeCategory, setActiveCategory] = useState('all')
   const [isGenerating, setIsGenerating] = useState(false)
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
   const [searchQuery, setSearchQuery] = useState('')
 
-  const currentRangeData = rangeMetrics[activeRange]
+  const isWithinRange = React.useCallback((dateStr) => {
+    if (!dateStr) return true;
+    const d = dateStr.split('T')[0];
+    if (startDate && d < startDate) return false;
+    if (endDate && d > endDate) return false;
+    return true;
+  }, [startDate, endDate]);
 
-  const activeRangeLabel = useMemo(
-    () => rangeOptions.find((range) => range.key === activeRange)?.label,
-    [activeRange],
-  )
+  const activeRangeLabel = useMemo(() => {
+    if (startDate === '2026-07-13' && endDate === '2026-07-20') return '7 Days';
+    if (startDate === '2026-06-20' && endDate === '2026-07-20') return '1 Month';
+    if (!startDate && !endDate) return 'All Time';
+    return 'Custom Range';
+  }, [startDate, endDate]);
 
-  const { 
-    products = [], 
-    workers = [], 
-    salesInvoices = [], 
-    serviceInvoices = [], 
-    creditSales = [], 
+  const currentRangeData = { salesLabel: 'Daily' };
+
+  const {
+    products = [],
+    workers = [],
+    salesInvoices = [],
+    serviceInvoices = [],
+    creditSales = [],
     invoiceLineItems = [],
     quickServices = [],
     exportRecords = [],
     expenses = [],
     salaryPayments = [],
     attendances = [],
-    isLoading 
+    isLoading
   } = helperData;
 
   console.log("helperData", {
@@ -95,23 +105,22 @@ const DashboardPage = ({ onLogout }) => {
 
 
   const salaryRows = useMemo(() => {
-    const currentMonth = new Date().toISOString().substring(0, 7);
     const roles = workers.reduce((acc, w) => {
       const role = w.role || w.jobRole || 'Unassigned';
       if (!acc[role]) acc[role] = { totalWorkers: 0, paidWorkers: 0, totalPaidAmount: 0 };
-      
+
       acc[role].totalWorkers += 1;
-      
+
       const id = w.id;
       const monthPayments = salaryPayments
-        .filter((p) => p.worker_id === id && p.paid_at?.startsWith(currentMonth))
+        .filter((p) => p.worker_id === id && isWithinRange(p.paid_at || p.created_at || p.date))
         .reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
-        
+
       if (monthPayments > 0) {
         acc[role].paidWorkers += 1;
         acc[role].totalPaidAmount += monthPayments;
       }
-      
+
       return acc;
     }, {});
 
@@ -121,7 +130,7 @@ const DashboardPage = ({ onLogout }) => {
       total: roles[role].totalWorkers,
       amount: 'Rs. ' + roles[role].totalPaidAmount.toLocaleString()
     }));
-  }, [workers, salaryPayments]);
+  }, [workers, salaryPayments, isWithinRange]);
 
   const totalPaidWorkers = useMemo(() => {
     return salaryRows.reduce((sum, r) => sum + r.paid, 0);
@@ -135,29 +144,37 @@ const DashboardPage = ({ onLogout }) => {
 
   const totalSales = useMemo(() => {
     return salesInvoices
-      .filter(i => !i.status || ['completed', 'paid'].includes(i.status.toLowerCase()))
+      .filter(i => (!i.status || ['completed', 'paid'].includes(i.status.toLowerCase())) && isWithinRange(i.invoice_date || i.created_at || i.createdAt))
       .reduce((sum, si) => sum + (parseFloat(si.grandTotal || si.grand_total || si.amount) || 0), 0);
-  }, [salesInvoices]);
+  }, [salesInvoices, isWithinRange]);
 
   const totalCreditSales = useMemo(() => {
-    return creditSales.reduce((sum, cs) => sum + (parseFloat(cs.amount) || 0), 0);
-  }, [creditSales]);
+    return creditSales
+      .filter(cs => isWithinRange(cs.sale_date || cs.created_at || cs.date))
+      .reduce((sum, cs) => sum + (parseFloat(cs.amount) || 0), 0);
+  }, [creditSales, isWithinRange]);
 
   const salesValue = useMemo(() => {
     return totalSales + totalCreditSales;
   }, [totalSales, totalCreditSales]);
 
   const serviceRevenue = useMemo(() => {
-    return serviceInvoices.reduce((sum, s) => sum + (parseFloat(s.price) || 0), 0);
-  }, [serviceInvoices]);
+    return serviceInvoices
+      .filter(s => isWithinRange(s.service_date || s.created_at || s.date))
+      .reduce((sum, s) => sum + (parseFloat(s.price) || 0), 0);
+  }, [serviceInvoices, isWithinRange]);
 
   const quickServiceRevenue = useMemo(() => {
-    return quickServices.reduce((sum, qs) => sum + (parseFloat(qs.price) || 0), 0);
-  }, [quickServices]);
+    return quickServices
+      .filter(qs => isWithinRange(qs.service_date || qs.created_at || qs.date))
+      .reduce((sum, qs) => sum + (parseFloat(qs.price) || 0), 0);
+  }, [quickServices, isWithinRange]);
 
   const tyreExportRevenue = useMemo(() => {
-    return exportRecords.reduce((sum, r) => sum + (parseFloat(r.total_amount) || 0), 0);
-  }, [exportRecords]);
+    return exportRecords
+      .filter(r => isWithinRange(r.export_date || r.created_at || r.date))
+      .reduce((sum, r) => sum + (parseFloat(r.total_amount) || 0), 0);
+  }, [exportRecords, isWithinRange]);
 
   const totalRevenue = useMemo(() => {
     return totalSales + totalCreditSales + serviceRevenue + quickServiceRevenue + tyreExportRevenue;
@@ -165,7 +182,7 @@ const DashboardPage = ({ onLogout }) => {
 
   const completedInvoiceProductCost = useMemo(() => {
     return salesInvoices
-      .filter(i => !i.status || ['completed', 'paid'].includes(i.status.toLowerCase()))
+      .filter(i => (!i.status || ['completed', 'paid'].includes(i.status.toLowerCase())) && isWithinRange(i.invoice_date || i.created_at || i.createdAt))
       .reduce((total, inv) => {
         const items = inv.line_items || inv.items || inv.parts || inv.invoice_items || [];
         const invCost = items.reduce((sum, il) => {
@@ -175,19 +192,25 @@ const DashboardPage = ({ onLogout }) => {
         }, 0);
         return total + invCost;
       }, 0);
-  }, [salesInvoices, products]);
+  }, [salesInvoices, products, isWithinRange]);
 
   const tyreExportCosts = useMemo(() => {
-    return exportRecords.reduce((sum, r) => sum + ((parseFloat(r.comp_price) || 0) * (parseInt(r.tyres) || 0)), 0);
-  }, [exportRecords]);
+    return exportRecords
+      .filter(r => isWithinRange(r.export_date || r.created_at || r.date))
+      .reduce((sum, r) => sum + ((parseFloat(r.comp_price) || 0) * (parseInt(r.tyres) || 0)), 0);
+  }, [exportRecords, isWithinRange]);
 
   const workerCosts = useMemo(() => {
-    return salaryPayments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
-  }, [salaryPayments]);
+    return salaryPayments
+      .filter(p => isWithinRange(p.paid_at || p.created_at || p.date))
+      .reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+  }, [salaryPayments, isWithinRange]);
 
   const totalGeneralExpenses = useMemo(() => {
-    return expenses.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
-  }, [expenses]);
+    return expenses
+      .filter(e => isWithinRange(e.expense_date || e.created_at || e.date))
+      .reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+  }, [expenses, isWithinRange]);
 
   const totalCosts = useMemo(() => {
     return totalGeneralExpenses + completedInvoiceProductCost + tyreExportCosts + workerCosts;
@@ -210,39 +233,40 @@ const DashboardPage = ({ onLogout }) => {
     let halfDay = 0;
     let absent = 0;
     attendances.forEach(a => {
+      if (!isWithinRange(a.date || a.attendance_date || a.created_at)) return;
       const status = a.status?.toUpperCase();
       if (status === 'PRESENT') present++;
       else if (status === 'HALF_DAY') halfDay++;
       else if (status === 'ABSENT') absent++;
     });
     return { present, halfDay, absent };
-  }, [attendances]);
+  }, [attendances, isWithinRange]);
 
   const salesChartData = useMemo(() => {
     const dailySales = {};
     const allInvoices = [
-      ...salesInvoices.map(i => ({ date: i.createdAt?.split('T')[0], amount: i.grandTotal || 0 })),
-      ...creditSales.map(i => ({ date: i.date?.split('T')[0], amount: i.amount || 0 }))
+      ...salesInvoices.filter(i => isWithinRange(i.invoice_date || i.created_at || i.createdAt)).map(i => ({ date: (i.invoice_date || i.createdAt || i.created_at)?.split('T')[0], amount: i.grandTotal || i.grand_total || i.amount || 0 })),
+      ...creditSales.filter(i => isWithinRange(i.sale_date || i.created_at || i.date)).map(i => ({ date: (i.sale_date || i.date || i.created_at)?.split('T')[0], amount: i.amount || 0 }))
     ];
-    
+
     allInvoices.forEach(inv => {
       if (!inv.date) return;
       if (!dailySales[inv.date]) dailySales[inv.date] = 0;
       dailySales[inv.date] += inv.amount;
     });
-    
+
     const sortedDates = Object.keys(dailySales).sort();
-    let dataPoints = sortedDates.slice(-7).map(d => dailySales[d]);
-    if (dataPoints.length === 0) dataPoints = [20, 40, 60, 40, 80, 50, 90]; 
+    let dataPoints = sortedDates.map(d => dailySales[d]);
+    if (dataPoints.length === 0) dataPoints = [20, 40, 60, 40, 80, 50, 90];
     if (dataPoints.length < 2) dataPoints = [0, ...dataPoints];
-    
+
     const maxSale = Math.max(...dataPoints, 1);
     return dataPoints.map(val => Math.round((val / maxSale) * 100));
-  }, [salesInvoices, creditSales]);
+  }, [salesInvoices, creditSales, isWithinRange]);
 
   const recentSales = useMemo(() => {
     const all = [
-      ...salesInvoices.map(si => ({
+      ...salesInvoices.filter(si => isWithinRange(si.invoice_date || si.created_at || si.createdAt)).map(si => ({
         id: `si_${si.id}`,
         invoiceId: si.invoice_id || si.id,
         customer: si.customer || 'Walk-in Customer',
@@ -251,7 +275,7 @@ const DashboardPage = ({ onLogout }) => {
         date: si.invoice_date || si.created_at?.split('T')[0] || '-',
         status: si.status || 'PAID'
       })),
-      ...creditSales.map(cs => ({
+      ...creditSales.filter(cs => isWithinRange(cs.sale_date || cs.created_at || cs.date)).map(cs => ({
         id: `cs_${cs.id}`,
         invoiceId: cs.credit_id || cs.id,
         customer: cs.customer_name || 'Unknown Customer',
@@ -262,7 +286,7 @@ const DashboardPage = ({ onLogout }) => {
       }))
     ];
     return all.sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5); // top 5 recent
-  }, [salesInvoices, creditSales]);
+  }, [salesInvoices, creditSales, isWithinRange]);
 
   const handleDownloadSaleReport = () => {
     setIsGenerating(true)
@@ -271,7 +295,7 @@ const DashboardPage = ({ onLogout }) => {
       const statsData = [
         [`TyreShop Sales Report - ${activeRangeLabel} View`],
         ['Generated on:', new Date().toLocaleString()],
-        ['Selection:', activeRange === 'daily' ? selectedDate : activeRangeLabel],
+        ['Selection:', activeRangeLabel],
         ['Search Filter:', searchQuery || 'None'],
         [],
         ['Metric', 'Value', 'Status/Trend'],
@@ -366,6 +390,47 @@ const DashboardPage = ({ onLogout }) => {
         </div>
 
         <div className="flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-3 bg-white p-1 rounded-xl shadow-sm border border-slate-200">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-lg">
+              <FiCalendar className="text-slate-400 text-sm" />
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="bg-transparent text-xs font-bold text-slate-700 outline-none cursor-pointer"
+              />
+              <span className="text-slate-400 text-xs font-bold">to</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="bg-transparent text-xs font-bold text-slate-700 outline-none cursor-pointer"
+              />
+            </div>
+
+            <div className="h-6 w-px bg-slate-200"></div>
+
+            <div className="flex p-0.5 gap-1 pr-1">
+              <button
+                onClick={() => { setStartDate('2026-07-13'); setEndDate('2026-07-20'); }}
+                className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${startDate === '2026-07-13' && endDate === '2026-07-20' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-50 text-slate-500 hover:text-slate-700'}`}
+              >
+                7 Days
+              </button>
+              <button
+                onClick={() => { setStartDate('2026-06-20'); setEndDate('2026-07-20'); }}
+                className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${startDate === '2026-06-20' && endDate === '2026-07-20' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-50 text-slate-500 hover:text-slate-700'}`}
+              >
+                1 Month
+              </button>
+              <button
+                onClick={() => { setStartDate(''); setEndDate(''); }}
+                className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${!startDate && !endDate ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-50 text-slate-500 hover:text-slate-700'}`}
+              >
+                All Time
+              </button>
+            </div>
+          </div>
 
           <button
             onClick={handleDownloadSaleReport}
@@ -649,8 +714,8 @@ const DashboardPage = ({ onLogout }) => {
                     </div>
                     <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
                       <div
-                         className="h-full bg-indigo-600 rounded-full transition-all duration-1000 ease-out"
-                         style={{ width: `${percent}%` }}
+                        className="h-full bg-indigo-600 rounded-full transition-all duration-1000 ease-out"
+                        style={{ width: `${percent}%` }}
                       />
                     </div>
                   </div>
