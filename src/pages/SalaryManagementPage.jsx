@@ -20,49 +20,56 @@ const SalaryManagementPage = () => {
     salaryPayments, 
     salaryAdvances, 
     workerCredits,
-    fetchAllData 
   } = useHelper();
+
+  console.log(
+    "worker", workers,
+    "attendance" , attendances,
+    "salaryPayments", salaryPayments,
+    "salaryAdvances", salaryAdvances,
+    "workerCredits", workerCredits,
+    
+  );
+  
 
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().substring(0, 7)); // YYYY-MM
 
-  // Process worker payroll cycles
   const payrollList = useMemo(() => {
     return workers.map((w) => {
-      const id = w.id || w.workerId;
+      const id = w.id;
       
-      // Filter records by selected month
       const monthAttendances = attendances.filter(
-        (a) => a.worker_id === id && a.attendance_date.startsWith(selectedMonth)
+        (a) => a.worker_id === id && a.attendance_date?.startsWith(selectedMonth)
       );
+      
       const monthAdvances = salaryAdvances
-        .filter((a) => (a.worker_id === id || a.workerId === id) && a.advance_date?.startsWith(selectedMonth))
+        .filter((a) => a.worker_id === id && a.advance_date?.startsWith(selectedMonth))
         .reduce((sum, a) => sum + (parseFloat(a.amount) || 0), 0);
+        
       const monthPayments = salaryPayments
-        .filter((p) => (p.worker_id === id || p.workerId === id) && p.paid_at?.startsWith(selectedMonth))
+        .filter((p) => p.worker_id === id && p.paid_at?.startsWith(selectedMonth))
         .reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
 
-      // Credits outstanding (not filtered by month, since outstanding is cumulative until settled)
       const creditsTotal = workerCredits
-        .filter((c) => c.worker_id === id || c.workerId === id)
+        .filter((c) => c.worker_id === id)
         .reduce((sum, c) => sum + (parseFloat(c.amount) || 0), 0);
 
-      // Attendance counts
       let present = 0;
       let halfDay = 0;
       let absent = 0;
+      
       monthAttendances.forEach((a) => {
-        const status = a.status?.toUpperCase();
+        const status = (a.status || '').toUpperCase();
         if (status === 'PRESENT') present++;
-        else if (status === 'HALF_DAY') halfDay++;
+        else if (status === 'HALF_DAY' || status === 'HALF DAY') halfDay++;
         else if (status === 'ABSENT') absent++;
       });
 
       const daysCount = present + halfDay * 0.5;
-      const rate = w.rate || 0;
+      const rate = parseFloat(w.rate) || 0;
       const gross = daysCount * rate;
       const netPayable = Math.max(0, gross - monthAdvances - creditsTotal);
 
-      // Payment Status
       let status = 'READY';
       if (netPayable <= 0) {
         status = 'NO PAYABLE';
@@ -73,8 +80,11 @@ const SalaryManagementPage = () => {
       }
 
       return {
-        ...w,
         id,
+        name: w.name,
+        jobRole: w.role || w.jobRole,
+        salaryType: w.salary_type || w.salaryType || 'Monthly',
+        rate,
         present,
         halfDay,
         absent,
@@ -232,11 +242,36 @@ const SalaryManagementPage = () => {
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-6 border-b border-slate-100 flex items-center gap-2">
           <FiBookOpen className="text-indigo-500 text-lg" />
-          <h3 className="text-lg font-bold text-slate-900">Credit Ledger</h3>
+          <h3 className="text-lg font-bold text-slate-900">Worker Credit Ledger</h3>
         </div>
-        <div className="p-8 text-center text-slate-400 text-sm font-medium">
-          No credit ledger entries found for outstanding accounts.
-        </div>
+        {workerCredits.length === 0 ? (
+          <div className="p-8 text-center text-slate-400 text-sm font-medium">
+            No credit ledger entries found.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-200">
+                  <th className="px-6 py-4">Worker</th>
+                  <th className="px-6 py-4">Date</th>
+                  <th className="px-6 py-4">Note</th>
+                  <th className="px-6 py-4 text-right">Amount</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {workerCredits.map((c) => (
+                  <tr key={c.id} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="px-6 py-4 font-bold text-slate-800 text-sm">{c.worker || 'Unknown'}</td>
+                    <td className="px-6 py-4 text-sm text-slate-500 font-mono">{c.credit_date || c.created_at?.split('T')[0] || '-'}</td>
+                    <td className="px-6 py-4 text-sm text-slate-500">{c.note || '-'}</td>
+                    <td className="px-6 py-4 text-right text-sm font-bold text-rose-500">Rs. {parseFloat(c.amount || 0).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
