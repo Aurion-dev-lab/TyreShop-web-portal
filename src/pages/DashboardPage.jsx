@@ -10,6 +10,8 @@ import {
   FiDownload,
   FiCalendar,
   FiLayers,
+  FiPieChart,
+  FiShoppingCart,
 } from 'react-icons/fi'
 import { rangeOptions, rangeMetrics } from '../data/metrics.jsx'
 import { useHelper } from '../context/helperContext.jsx'
@@ -195,6 +197,14 @@ const DashboardPage = ({ onLogout }) => {
     return totalRevenue - totalCosts;
   }, [totalRevenue, totalCosts]);
 
+  const grossProfit = useMemo(() => {
+    return totalRevenue - (completedInvoiceProductCost + tyreExportCosts);
+  }, [totalRevenue, completedInvoiceProductCost, tyreExportCosts]);
+
+  const cogs = useMemo(() => {
+    return completedInvoiceProductCost + tyreExportCosts;
+  }, [completedInvoiceProductCost, tyreExportCosts]);
+
   const attendanceStats = useMemo(() => {
     let present = 0;
     let halfDay = 0;
@@ -290,6 +300,24 @@ const DashboardPage = ({ onLogout }) => {
       label: 'Sales (Invoices + Credit)'
     },
     {
+      key: 'cogs',
+      category: 'revenue',
+      icon: <FiShoppingCart className="text-rose-500" />,
+      value: `Rs. ${cogs.toLocaleString()}`,
+      trend: 'Cost of Inventory',
+      trendType: 'warning',
+      label: 'Cost of Goods Sold (COGS)'
+    },
+    {
+      key: 'grossProfit',
+      category: 'revenue',
+      icon: <FiPieChart className="text-blue-500" />,
+      value: `Rs. ${grossProfit.toLocaleString()}`,
+      trend: `Margin: ${totalRevenue > 0 ? Math.round((grossProfit / totalRevenue) * 100) : 0}%`,
+      trendType: 'info',
+      label: 'Gross Profit'
+    },
+    {
       key: 'revenue',
       icon: <FiDollarSign className="text-emerald-500" />,
       value: `Rs. ${totalRevenue.toLocaleString()}`,
@@ -318,7 +346,7 @@ const DashboardPage = ({ onLogout }) => {
   const visibleStats =
     activeCategory === 'all'
       ? topStats
-      : topStats.filter((card) => card.key === activeCategory)
+      : topStats.filter((card) => (card.category || card.key) === activeCategory)
 
   return (
     <div className="space-y-8">
@@ -338,37 +366,6 @@ const DashboardPage = ({ onLogout }) => {
         </div>
 
         <div className="flex flex-wrap items-center gap-4">
-          <div className="flex items-center gap-3 bg-white p-1 rounded-xl shadow-sm border border-slate-200">
-            <div className="flex p-0.5 bg-slate-50 rounded-lg">
-              {rangeOptions.map((range) => (
-                <button
-                  key={range.key}
-                  onClick={() => setActiveRange(range.key)}
-                  className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${activeRange === range.key
-                    ? 'bg-white text-indigo-600 shadow-sm'
-                    : 'text-slate-400 hover:text-slate-600'
-                    }`}
-                >
-                  {range.label}
-                </button>
-              ))}
-            </div>
-
-            <div className="h-6 w-px bg-slate-200"></div>
-
-            <div className="relative flex items-center gap-2 pr-2">
-              <FiCalendar className="text-slate-400 text-sm" />
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => {
-                  setSelectedDate(e.target.value)
-                  setActiveRange('daily')
-                }}
-                className="bg-transparent text-xs font-bold text-slate-700 outline-none cursor-pointer"
-              />
-            </div>
-          </div>
 
           <button
             onClick={handleDownloadSaleReport}
@@ -667,9 +664,6 @@ const DashboardPage = ({ onLogout }) => {
                 <FiCheckCircle className="text-indigo-200" />
                 <span className="text-xs font-bold uppercase tracking-wider">{totalPaidWorkers} of {workers.length} salaries released</span>
               </div>
-              <button onClick={() => navigate('/workers-log')} className="text-[10px] font-black uppercase tracking-widest bg-white/20 px-3 py-1.5 rounded hover:bg-white/30 transition-colors cursor-pointer">
-                Details
-              </button>
             </div>
           </div>
         )}
