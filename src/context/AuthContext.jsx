@@ -9,13 +9,47 @@ export const AuthProvider = ({ children }) => {
   )
   const isAuthenticated = !!accessToken
 
+  const logout = () => {
+    localStorage.removeItem('accessToken')
+    setAccessTokenState(null)
+  }
+
+  const isTokenExpired = (token) => {
+    if (!token) return true;
+    try {
+      const payloadBase64 = token.split('.')[1];
+      const decodedJson = atob(payloadBase64);
+      const decoded = JSON.parse(decodedJson);
+      if (!decoded.exp) return false;
+      const now = Date.now() / 1000;
+      return decoded.exp < now;
+    } catch (error) {
+      return true;
+    }
+  };
+
   useLayoutEffect(() => {
+    if (accessToken && isTokenExpired(accessToken)) {
+      logout();
+      return;
+    }
+
+    const interval = setInterval(() => {
+      if (accessToken && isTokenExpired(accessToken)) {
+        logout();
+      }
+    }, 60000); // Check every minute
+
     const req = api.interceptors.request.use(
       (config) => {
         console.log('🔵 Request URL:', config.url)
         const isAuthRequest = config.url?.includes('/auth/login')
 
         if (!isAuthRequest && accessToken) {
+          if (isTokenExpired(accessToken)) {
+             logout();
+             return Promise.reject(new Error('Token expired'));
+          }
           config.headers.Authorization = `Bearer ${accessToken}`
         }
 
@@ -41,6 +75,7 @@ export const AuthProvider = ({ children }) => {
     )
 
     return () => {
+      clearInterval(interval);
       api.interceptors.request.eject(req)
       api.interceptors.response.eject(res)
     }
@@ -53,11 +88,6 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('accessToken', token)
     setAccessTokenState(token)
     return res
-  }
-
-  const logout = () => {
-    localStorage.removeItem('accessToken')
-    setAccessTokenState(null)
   }
 
   return (
