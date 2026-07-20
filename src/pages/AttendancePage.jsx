@@ -18,8 +18,6 @@ const AttendancePage = () => {
   );
   const [historyTo, setHistoryTo] = useState(new Date().toISOString().split('T')[0]);
   
-console.log( workers, attendances);
-
   const filteredHistory = useMemo(() => {
     return attendances
       .filter(a => {
@@ -65,9 +63,9 @@ console.log( workers, attendances);
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 gap-8">
         {/* Main Columns */}
-        <div className="lg:col-span-2 space-y-8">
+        <div className="space-y-8">
 
           {/* Attendance History Card */}
           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
@@ -145,36 +143,7 @@ console.log( workers, attendances);
           </div>
         </div>
 
-        {/* Sidebar Summary Column */}
-        <div className="bg-[#1e2530] text-white rounded-3xl p-6 shadow-sm border border-slate-800 space-y-6">
-          <div className="flex justify-between items-center border-b border-slate-800 pb-4">
-            <div>
-              <h3 className="text-lg font-bold">Monthly Summary</h3>
-              <p className="text-xs text-slate-400">Current payouts calculated</p>
-            </div>
-            <input
-              type="month"
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              className="bg-slate-800 border border-slate-700 text-white rounded-xl px-2 py-1 text-xs font-semibold cursor-pointer outline-none"
-            />
-          </div>
 
-          <div className="space-y-4">
-            {monthlySummary.map((sum) => (
-              <div key={sum.workerId} className="flex justify-between items-center p-3 bg-slate-800/40 rounded-2xl border border-slate-800/80">
-                <div>
-                  <p className="font-bold text-sm text-slate-200">{sum.name}</p>
-                  <p className="text-xs text-slate-400">{sum.days} DAYS</p>
-                </div>
-                <div className="text-right">
-                  <p className="font-bold text-sm text-emerald-400">Rs. {sum.netPayable?.toLocaleString()}</p>
-                  <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Gross Payable</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
     </div>
   );

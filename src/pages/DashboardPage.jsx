@@ -1,13 +1,10 @@
 import React, { useMemo, useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  FiBox,
   FiCheckCircle,
   FiDollarSign,
   FiTool,
   FiTrendingUp,
-  FiSearch,
-  FiBell,
   FiUser,
   FiChevronRight,
   FiDownload,
@@ -52,6 +49,20 @@ const DashboardPage = ({ onLogout }) => {
     isLoading 
   } = helperData;
 
+  console.log("helperData", {
+    products,
+    workers,
+    salesInvoices,
+    serviceInvoices,
+    creditSales,
+    invoiceLineItems,
+    quickServices,
+    exportRecords,
+    expenses,
+    salaryPayments,
+    attendances,
+  });
+
   const categoryOptions = [
     { key: 'all', label: 'All Operations', icon: <FiLayers /> },
     { key: 'sales', label: 'Sales', icon: <FiTrendingUp /> },
@@ -80,42 +91,39 @@ const DashboardPage = ({ onLogout }) => {
     )
   }, [inventoryRows, searchQuery])
 
-  const servicesRows = useMemo(() => {
-    const groups = serviceInvoices.reduce((acc, inv) => {
-      acc[inv.description] = (acc[inv.description] || 0) + 1
-      return acc
-    }, {})
-    return Object.keys(groups).map(desc => {
-      const count = groups[desc]
-      return {
-        service: desc,
-        count: count,
-        target: count + 5,
-        status: count > 2 ? 'Ahead' : 'Normal'
-      }
-    })
-  }, [serviceInvoices])
-
-  const filteredServices = useMemo(() => {
-    return servicesRows.filter(row =>
-      row.service.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-  }, [servicesRows, searchQuery])
 
   const salaryRows = useMemo(() => {
+    const currentMonth = new Date().toISOString().substring(0, 7);
     const roles = workers.reduce((acc, w) => {
-      if (!acc[w.jobRole]) acc[w.jobRole] = { count: 0, amount: 0 }
-      acc[w.jobRole].count += 1
-      acc[w.jobRole].amount += (w.rate || 0)
-      return acc
-    }, {})
+      const role = w.role || w.jobRole || 'Unassigned';
+      if (!acc[role]) acc[role] = { totalWorkers: 0, paidWorkers: 0, totalPaidAmount: 0 };
+      
+      acc[role].totalWorkers += 1;
+      
+      const id = w.id;
+      const monthPayments = salaryPayments
+        .filter((p) => p.worker_id === id && p.paid_at?.startsWith(currentMonth))
+        .reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+        
+      if (monthPayments > 0) {
+        acc[role].paidWorkers += 1;
+        acc[role].totalPaidAmount += monthPayments;
+      }
+      
+      return acc;
+    }, {});
+
     return Object.keys(roles).map(role => ({
       team: role,
-      paid: roles[role].count,
-      total: roles[role].count,
-      amount: 'Rs. ' + roles[role].amount.toLocaleString()
-    }))
-  }, [workers])
+      paid: roles[role].paidWorkers,
+      total: roles[role].totalWorkers,
+      amount: 'Rs. ' + roles[role].totalPaidAmount.toLocaleString()
+    }));
+  }, [workers, salaryPayments]);
+
+  const totalPaidWorkers = useMemo(() => {
+    return salaryRows.reduce((sum, r) => sum + r.paid, 0);
+  }, [salaryRows]);
 
   const filteredSalary = useMemo(() => {
     return salaryRows.filter(row =>
@@ -123,17 +131,11 @@ const DashboardPage = ({ onLogout }) => {
     )
   }, [salaryRows, searchQuery])
 
-  // --- Real-time Financial Calculations (matching K-Line Backend/Frontend logic) ---
   const totalSales = useMemo(() => {
-    const completedInvoiceIds = new Set(
-      salesInvoices
-        .filter(i => i.status?.toLowerCase() === 'completed')
-        .map(i => i.id || i.invoiceId)
-    );
-    return invoiceLineItems
-      .filter(il => completedInvoiceIds.has(il.invoice_id))
-      .reduce((sum, il) => sum + (parseFloat(il.total) || 0), 0);
-  }, [invoiceLineItems, salesInvoices]);
+    return salesInvoices
+      .filter(i => !i.status || ['completed', 'paid'].includes(i.status.toLowerCase()))
+      .reduce((sum, si) => sum + (parseFloat(si.grandTotal || si.grand_total || si.amount) || 0), 0);
+  }, [salesInvoices]);
 
   const totalCreditSales = useMemo(() => {
     return creditSales.reduce((sum, cs) => sum + (parseFloat(cs.amount) || 0), 0);
@@ -160,19 +162,18 @@ const DashboardPage = ({ onLogout }) => {
   }, [totalSales, totalCreditSales, serviceRevenue, quickServiceRevenue, tyreExportRevenue]);
 
   const completedInvoiceProductCost = useMemo(() => {
-    const completedInvoiceIds = new Set(
-      salesInvoices
-        .filter(i => i.status?.toLowerCase() === 'completed')
-        .map(i => i.id || i.invoiceId)
-    );
-    return invoiceLineItems
-      .filter(il => completedInvoiceIds.has(il.invoice_id))
-      .reduce((sum, il) => {
-        const product = products.find(p => p.id === il.product_id);
-        const buyPrice = product ? (parseFloat(product.buy_price) || 0) : 0;
-        return sum + ((parseInt(il.qty) || 0) * buyPrice);
+    return salesInvoices
+      .filter(i => !i.status || ['completed', 'paid'].includes(i.status.toLowerCase()))
+      .reduce((total, inv) => {
+        const items = inv.line_items || inv.items || inv.parts || inv.invoice_items || [];
+        const invCost = items.reduce((sum, il) => {
+          const product = products.find(p => p.id === il.product_id);
+          const buyPrice = product ? (parseFloat(product.buy_price) || 0) : 0;
+          return sum + ((parseInt(il.qty || il.quantity) || 0) * buyPrice);
+        }, 0);
+        return total + invCost;
       }, 0);
-  }, [invoiceLineItems, salesInvoices, products]);
+  }, [salesInvoices, products]);
 
   const tyreExportCosts = useMemo(() => {
     return exportRecords.reduce((sum, r) => sum + ((parseFloat(r.comp_price) || 0) * (parseInt(r.tyres) || 0)), 0);
@@ -227,6 +228,30 @@ const DashboardPage = ({ onLogout }) => {
     
     const maxSale = Math.max(...dataPoints, 1);
     return dataPoints.map(val => Math.round((val / maxSale) * 100));
+  }, [salesInvoices, creditSales]);
+
+  const recentSales = useMemo(() => {
+    const all = [
+      ...salesInvoices.map(si => ({
+        id: `si_${si.id}`,
+        invoiceId: si.invoice_id || si.id,
+        customer: si.customer || 'Walk-in Customer',
+        type: 'Sale',
+        amount: parseFloat(si.grand_total || si.amount || 0),
+        date: si.invoice_date || si.created_at?.split('T')[0] || '-',
+        status: si.status || 'PAID'
+      })),
+      ...creditSales.map(cs => ({
+        id: `cs_${cs.id}`,
+        invoiceId: cs.credit_id || cs.id,
+        customer: cs.customer_name || 'Unknown Customer',
+        type: 'Credit Sale',
+        amount: parseFloat(cs.amount || 0),
+        date: cs.sale_date || cs.created_at?.split('T')[0] || '-',
+        status: cs.status || 'UNPAID'
+      }))
+    ];
+    return all.sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5); // top 5 recent
   }, [salesInvoices, creditSales]);
 
   const handleDownloadSaleReport = () => {
@@ -412,39 +437,42 @@ const DashboardPage = ({ onLogout }) => {
           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-bold text-slate-900">Sales Tracking</h3>
-                <p className="text-sm text-slate-500">Live operational status</p>
+                <h3 className="text-lg font-bold text-slate-900">Recent Sales</h3>
+                <p className="text-sm text-slate-500">Latest sales and credit transactions</p>
               </div>
               <span className="px-3 py-1 bg-indigo-50 text-indigo-600 text-xs font-bold rounded-lg uppercase">
                 {activeRangeLabel}
               </span>
             </div>
             <div className="divide-y divide-slate-50">
-              {filteredServices.length > 0 ? filteredServices.map((row) => (
-                <div key={row.service} className="p-5 flex items-center justify-between hover:bg-slate-50/50 transition-colors group">
+              {recentSales.length > 0 ? recentSales.map((row) => (
+                <div key={row.id} className="p-5 flex items-center justify-between hover:bg-slate-50/50 transition-colors group">
                   <div className="flex items-center gap-4">
                     <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 group-hover:bg-white group-hover:shadow-md transition-all">
-                      <FiTool />
+                      <FiDollarSign />
                     </div>
                     <div>
-                      <p className="font-bold text-slate-800">{row.service}</p>
+                      <p className="font-bold text-slate-800">{row.customer}</p>
                       <p className="text-xs text-slate-500">
-                        <span className="text-indigo-600 font-semibold">{row.count}</span> completed of <span className="font-semibold">{row.target}</span> target
+                        {row.type} &bull; <span className="font-mono text-slate-400">{row.invoiceId}</span>
                       </p>
                     </div>
                   </div>
-                  <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${row.status === 'Ahead' ? 'bg-emerald-100 text-emerald-700' :
-                    row.status === 'Attention' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'
-                    }`}>
-                    {row.status}
+                  <div className="text-right">
+                    <p className="font-bold text-sm text-slate-900">Rs. {row.amount.toLocaleString()}</p>
+                    <div className={`inline-block px-2 py-0.5 mt-1 rounded-full text-[9px] font-bold uppercase tracking-wider ${row.status === 'PAID' || row.status === 'settled' ? 'bg-emerald-100 text-emerald-700' :
+                      row.status === 'UNPAID' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'
+                      }`}>
+                      {row.status}
+                    </div>
                   </div>
                 </div>
               )) : (
-                <div className="p-10 text-center text-slate-400 text-sm font-medium">No matching services found.</div>
+                <div className="p-10 text-center text-slate-400 text-sm font-medium">No recent sales found.</div>
               )}
             </div>
             <button onClick={() => navigate('/credit-sales')} className="w-full p-4 text-sm font-semibold text-indigo-600 hover:bg-indigo-50 transition-colors flex items-center justify-center gap-2 border-t border-slate-100 cursor-pointer">
-              View Full Service Log <FiChevronRight />
+              View Full Sales Ledger <FiChevronRight />
             </button>
           </div>
         )}
@@ -612,7 +640,7 @@ const DashboardPage = ({ onLogout }) => {
             </div>
             <div className="p-6 space-y-6">
               {filteredSalary.length > 0 ? filteredSalary.map((row) => {
-                const percent = Math.round((row.paid / row.total) * 100)
+                const percent = row.total > 0 ? Math.round((row.paid / row.total) * 100) : 0;
                 return (
                   <div key={row.team} className="space-y-2">
                     <div className="flex justify-between items-end">
@@ -637,7 +665,7 @@ const DashboardPage = ({ onLogout }) => {
             <div className="mt-auto p-4 bg-indigo-600 text-white flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <FiCheckCircle className="text-indigo-200" />
-                <span className="text-xs font-bold uppercase tracking-wider">{workers.length} of {workers.length} salaries released</span>
+                <span className="text-xs font-bold uppercase tracking-wider">{totalPaidWorkers} of {workers.length} salaries released</span>
               </div>
               <button onClick={() => navigate('/workers-log')} className="text-[10px] font-black uppercase tracking-widest bg-white/20 px-3 py-1.5 rounded hover:bg-white/30 transition-colors cursor-pointer">
                 Details
