@@ -98,17 +98,21 @@ export const HelperProvider = ({ children }) => {
       if (workersRes?.data?.status === 'success') {
         const mappedWorkers = (workersRes.data.data || []).map(w => ({
           ...w,
+          id: w.id,
           workerId: w.id,
           name: w.name,
-          jobRole: w.role,
-          telephone: w.phone,
-          salaryType: w.salary_type || 'Monthly',
+          jobRole: w.role || w.jobRole,
+          role: w.role || w.jobRole,
+          telephone: w.phone || w.telephone,
+          salaryType: w.salary_type || w.salaryType || 'Monthly',
           rate: w.rate ? parseFloat(w.rate) : 0,
         }));
         setWorkers(mappedWorkers);
       }
 
-      if (attendancesRes?.data?.status === 'success') setAttendances(attendancesRes.data.data || []);
+      const attendancesData = attendancesRes?.data?.data || attendancesRes?.data || [];
+      if (Array.isArray(attendancesData)) setAttendances(attendancesData);
+      else if (attendancesRes?.data?.status === 'success') setAttendances(attendancesRes.data.data || []);
       if (productImagesRes?.data?.status === 'success') setProductImages(productImagesRes.data.data || []);
       if (workerCreditsRes?.data?.status === 'success') setWorkerCredits(workerCreditsRes.data.data || []);
       if (salaryPaymentsRes?.data?.status === 'success') setSalaryPayments(salaryPaymentsRes.data.data || []);
