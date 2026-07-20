@@ -148,15 +148,15 @@ const DashboardPage = ({ onLogout }) => {
       .reduce((sum, si) => sum + (parseFloat(si.grandTotal || si.grand_total || si.amount) || 0), 0);
   }, [salesInvoices, isWithinRange]);
 
-  const totalCreditSales = useMemo(() => {
+  const outstandingDebt = useMemo(() => {
     return creditSales
       .filter(cs => isWithinRange(cs.sale_date || cs.created_at || cs.date))
       .reduce((sum, cs) => sum + (parseFloat(cs.amount) || 0), 0);
   }, [creditSales, isWithinRange]);
 
   const salesValue = useMemo(() => {
-    return totalSales + totalCreditSales;
-  }, [totalSales, totalCreditSales]);
+    return totalSales;
+  }, [totalSales]);
 
   const serviceRevenue = useMemo(() => {
     return serviceInvoices
@@ -177,8 +177,8 @@ const DashboardPage = ({ onLogout }) => {
   }, [exportRecords, isWithinRange]);
 
   const totalRevenue = useMemo(() => {
-    return totalSales + totalCreditSales + serviceRevenue + quickServiceRevenue + tyreExportRevenue;
-  }, [totalSales, totalCreditSales, serviceRevenue, quickServiceRevenue, tyreExportRevenue]);
+    return totalSales + serviceRevenue + quickServiceRevenue + tyreExportRevenue;
+  }, [totalSales, serviceRevenue, quickServiceRevenue, tyreExportRevenue]);
 
   const completedInvoiceProductCost = useMemo(() => {
     return salesInvoices
@@ -245,8 +245,7 @@ const DashboardPage = ({ onLogout }) => {
   const salesChartData = useMemo(() => {
     const dailySales = {};
     const allInvoices = [
-      ...salesInvoices.filter(i => isWithinRange(i.invoice_date || i.created_at || i.createdAt)).map(i => ({ date: (i.invoice_date || i.createdAt || i.created_at)?.split('T')[0], amount: i.grandTotal || i.grand_total || i.amount || 0 })),
-      ...creditSales.filter(i => isWithinRange(i.sale_date || i.created_at || i.date)).map(i => ({ date: (i.sale_date || i.date || i.created_at)?.split('T')[0], amount: i.amount || 0 }))
+      ...salesInvoices.filter(i => isWithinRange(i.invoice_date || i.created_at || i.createdAt)).map(i => ({ date: (i.invoice_date || i.createdAt || i.created_at)?.split('T')[0], amount: i.grandTotal || i.grand_total || i.amount || 0 }))
     ];
 
     allInvoices.forEach(inv => {
@@ -262,7 +261,7 @@ const DashboardPage = ({ onLogout }) => {
 
     const maxSale = Math.max(...dataPoints, 1);
     return dataPoints.map(val => Math.round((val / maxSale) * 100));
-  }, [salesInvoices, creditSales, isWithinRange]);
+  }, [salesInvoices, isWithinRange]);
 
   const recentSales = useMemo(() => {
     const all = [
@@ -274,19 +273,10 @@ const DashboardPage = ({ onLogout }) => {
         amount: parseFloat(si.grand_total || si.amount || 0),
         date: si.invoice_date || si.created_at?.split('T')[0] || '-',
         status: si.status || 'PAID'
-      })),
-      ...creditSales.filter(cs => isWithinRange(cs.sale_date || cs.created_at || cs.date)).map(cs => ({
-        id: `cs_${cs.id}`,
-        invoiceId: cs.credit_id || cs.id,
-        customer: cs.customer_name || 'Unknown Customer',
-        type: 'Credit Sale',
-        amount: parseFloat(cs.amount || 0),
-        date: cs.sale_date || cs.created_at?.split('T')[0] || '-',
-        status: cs.status || 'UNPAID'
       }))
     ];
     return all.sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5); // top 5 recent
-  }, [salesInvoices, creditSales, isWithinRange]);
+  }, [salesInvoices, isWithinRange]);
 
   const handleDownloadSaleReport = () => {
     setIsGenerating(true)
@@ -364,6 +354,15 @@ const DashboardPage = ({ onLogout }) => {
       trend: `P: ${attendanceStats.present} | H: ${attendanceStats.halfDay} | A: ${attendanceStats.absent}`,
       trendType: 'info',
       label: 'Worker Payroll & Attendance'
+    },
+    {
+      key: 'debt',
+      category: 'revenue',
+      icon: <FiLayers className="text-purple-500" />,
+      value: `Rs. ${outstandingDebt.toLocaleString()}`,
+      trend: `${creditSales.filter(cs => isWithinRange(cs.sale_date || cs.created_at || cs.date) && parseFloat(cs.amount) > 0).length} Unpaid Credits`,
+      trendType: outstandingDebt > 0 ? 'warning' : 'info',
+      label: 'Outstanding Debt'
     }
   ]
 
