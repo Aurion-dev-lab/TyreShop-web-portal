@@ -18,6 +18,9 @@ const InventoryPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
 
+  console.log(products);
+  
+
   // Stats calculations
   const totalProducts = products.length;
   const unitsInStock = products.reduce((sum, p) => sum + (parseInt(p.stock) || 0), 0);
@@ -49,10 +52,6 @@ const InventoryPage = () => {
           </h1>
           <p className="text-slate-500 mt-1 text-sm font-medium">Track and manage your vehicle parts stock</p>
         </div>
-        <button className="flex items-center gap-2 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 active:scale-95 transition-all text-white rounded-xl font-semibold text-sm shadow-md cursor-pointer">
-          <FiPlus />
-          <span>Add product</span>
-        </button>
       </div>
 
       {/* KPI Cards */}

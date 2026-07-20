@@ -93,7 +93,7 @@ export const HelperProvider = ({ children }) => {
           minStock: p.minimum_stock_alert || 5,
         }));
         setProducts(mappedProducts);
-      }
+      }      
 
       if (workersRes?.data?.status === 'success') {
         const mappedWorkers = (workersRes.data.data || []).map(w => ({

@@ -47,7 +47,7 @@ export const AuthProvider = ({ children }) => {
   }, [accessToken])
 
   const login = async (credentials) => {
-    const res = await api.post('auth/login', credentials)
+    const res = await api.post('/auth/login', credentials)
     const token = res.data?.data?.accessToken
 
     localStorage.setItem('accessToken', token)

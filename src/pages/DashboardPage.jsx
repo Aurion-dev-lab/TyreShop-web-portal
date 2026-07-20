@@ -412,7 +412,7 @@ const DashboardPage = ({ onLogout }) => {
           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-bold text-slate-900">Services & Sales Tracking</h3>
+                <h3 className="text-lg font-bold text-slate-900">Sales Tracking</h3>
                 <p className="text-sm text-slate-500">Live operational status</p>
               </div>
               <span className="px-3 py-1 bg-indigo-50 text-indigo-600 text-xs font-bold rounded-lg uppercase">
@@ -443,7 +443,7 @@ const DashboardPage = ({ onLogout }) => {
                 <div className="p-10 text-center text-slate-400 text-sm font-medium">No matching services found.</div>
               )}
             </div>
-            <button onClick={() => navigate('/services')} className="w-full p-4 text-sm font-semibold text-indigo-600 hover:bg-indigo-50 transition-colors flex items-center justify-center gap-2 border-t border-slate-100 cursor-pointer">
+            <button onClick={() => navigate('/credit-sales')} className="w-full p-4 text-sm font-semibold text-indigo-600 hover:bg-indigo-50 transition-colors flex items-center justify-center gap-2 border-t border-slate-100 cursor-pointer">
               View Full Service Log <FiChevronRight />
             </button>
           </div>

@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   FiGrid,
+  FiCalendar,
   FiUsers,
   FiBox,
   FiFileText,
@@ -27,15 +28,10 @@ const Layout = ({ children }) => {
   const menuItems = [
     { path: '/dashboard', label: 'Dashboard', icon: <FiGrid /> },
     { path: '/workers', label: 'Workers', icon: <FiUsers /> },
+    { path: '/attendance', label: 'Attendance', icon: <FiCalendar /> },
     { path: '/inventory', label: 'Inventory', icon: <FiBox /> },
-    { path: '/invoices', label: 'Invoices & Billing', icon: <FiFileText /> },
-    { path: '/services', label: 'Services', icon: <FiTool /> },
-    { path: '/credit-sales', label: 'Credit Sales', icon: <FiCreditCard /> },
-    { path: '/tyre-exports', label: 'Tyre Exports', icon: <FiTruck /> },
-    { path: '/expenses', label: 'Expenses', icon: <FiAlertCircle /> },
-    { path: '/salary-management', label: 'Salary Management', icon: <FiDollarSign /> },
-    { path: '/analytics', label: 'Analytics Charts', icon: <FiBarChart2 /> },
-    { path: '/reports', label: 'Reports', icon: <FiFileText /> },
+    { path: '/credit-sales', label: 'Sales', icon: <FiCreditCard /> },
+    { path: '/salary-management', label: 'Salary', icon: <FiDollarSign /> },
   ];
 
   return (
@@ -82,25 +78,6 @@ const Layout = ({ children }) => {
 
         {/* Footer Actions */}
         <div className="p-3 border-t border-slate-800 space-y-2">
-          {/* Quick Actions Button */}
-          {!collapsed ? (
-            <button 
-              onClick={() => navigate('/dashboard')}
-              className="w-full flex items-center justify-center gap-2 py-2.5 bg-emerald-500 hover:bg-emerald-600 active:scale-95 transition-all text-white font-semibold text-xs rounded-xl shadow-lg shadow-emerald-950/10 cursor-pointer"
-            >
-              <FiSettings />
-              <span>Manage Quick Actions</span>
-            </button>
-          ) : (
-            <button 
-              onClick={() => navigate('/dashboard')}
-              className="w-full flex items-center justify-center py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl cursor-pointer"
-              title="Quick Actions"
-            >
-              <FiSettings />
-            </button>
-          )}
-
           {/* Collapse toggle */}
           <button
             onClick={() => setCollapsed(!collapsed)}
