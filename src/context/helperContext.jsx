@@ -16,7 +16,9 @@ import {
   getSalesInvoices,
   getInvoiceLineItems,
   getCustomers,
-  getExpenses
+  getExpenses,
+  getCreditPayments,
+  getTyreExportPayments
 } from '../api/api.js';
 
 const HelperContext = createContext();
@@ -39,6 +41,8 @@ export const HelperProvider = ({ children }) => {
   const [quickServicePresets, setQuickServicePresets] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [expenses, setExpenses] = useState([]);
+  const [creditPayments, setCreditPayments] = useState([]);
+  const [tyreExportPayments, setTyreExportPayments] = useState([]);
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -64,25 +68,29 @@ export const HelperProvider = ({ children }) => {
         quickServicesRes,
         quickServicePresetsRes,
         customersRes,
-        expensesRes
+        expensesRes,
+        creditPaymentsRes,
+        tyreExportPaymentsRes
       ] = await Promise.all([
-        getProducts(),
-        getProductImages(),
-        getWorkers(),
-        getAttendances(),
-        getWorkerCredits(),
-        getSalaryPayments(),
-        getSalaryAdvances(),
-        getCreditSales(),
-        getCreditSaleParts(),
-        getExportRecords(),
-        getSalesInvoices(),
-        getInvoiceLineItems(),
-        getServiceInvoices(),
-        getQuickServices(),
-        getQuickServicePresets(),
-        getCustomers(),
-        getExpenses()
+        getProducts().catch(() => null),
+        getProductImages().catch(() => null),
+        getWorkers().catch(() => null),
+        getAttendances().catch(() => null),
+        getWorkerCredits().catch(() => null),
+        getSalaryPayments().catch(() => null),
+        getSalaryAdvances().catch(() => null),
+        getCreditSales().catch(() => null),
+        getCreditSaleParts().catch(() => null),
+        getExportRecords().catch(() => null),
+        getSalesInvoices().catch(() => null),
+        getInvoiceLineItems().catch(() => null),
+        getServiceInvoices().catch(() => null),
+        getQuickServices().catch(() => null),
+        getQuickServicePresets().catch(() => null),
+        getCustomers().catch(() => null),
+        getExpenses().catch(() => null),
+        getCreditPayments().catch(() => null),
+        getTyreExportPayments().catch(() => null)
       ]);
 
       if (productsRes?.data?.status === 'success') {
@@ -133,6 +141,8 @@ export const HelperProvider = ({ children }) => {
       if (quickServicePresetsRes?.data?.status === 'success') setQuickServicePresets(quickServicePresetsRes.data.data || []);
       if (customersRes?.data?.status === 'success') setCustomers(customersRes.data.data || []);
       if (expensesRes?.data?.status === 'success') setExpenses(expensesRes.data.data || []);
+      if (creditPaymentsRes?.data?.status === 'success') setCreditPayments(creditPaymentsRes.data.data || []);
+      if (tyreExportPaymentsRes?.data?.status === 'success') setTyreExportPayments(tyreExportPaymentsRes.data.data || []);
 
       if (serviceInvoicesRes?.data?.status === 'success') {
         const mappedServices = (serviceInvoicesRes.data.data || []).map(s => ({
@@ -181,6 +191,8 @@ export const HelperProvider = ({ children }) => {
       quickServicePresets,
       customers,
       expenses,
+      creditPayments,
+      tyreExportPayments,
       isLoading,
       error,
       fetchAllData
