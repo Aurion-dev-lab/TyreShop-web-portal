@@ -24,5 +24,7 @@ export const getSalesInvoices = () => api.get('invoices');
 export const getInvoiceLineItems = () => api.get('invoicelineitems');
 export const getCustomers = () => api.get('customers');
 export const getExpenses = () => api.get('expenses');
+export const getCreditPayments = () => api.get('credit-payments');
+export const getTyreExportPayments = () => api.get('tyre-export-payments');
 
 export default api;

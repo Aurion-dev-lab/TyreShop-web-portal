@@ -12,6 +12,7 @@ import {
   FiLayers,
   FiPieChart,
   FiShoppingCart,
+  FiFileText,
 } from 'react-icons/fi'
 import { rangeOptions, rangeMetrics } from '../data/metrics.jsx'
 import { useHelper } from '../context/helperContext.jsx'
@@ -23,8 +24,12 @@ const DashboardPage = ({ onLogout }) => {
   const helperData = useHelper()
   const { logout } = useAuth()
 
-  const [startDate, setStartDate] = useState('2026-07-13')
-  const [endDate, setEndDate] = useState('2026-07-20')
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return d.toISOString().split('T')[0];
+  })
+  const [endDate, setEndDate] = useState(() => new Date().toISOString().split('T')[0])
   const [activeCategory, setActiveCategory] = useState('all')
   const [isGenerating, setIsGenerating] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -38,10 +43,8 @@ const DashboardPage = ({ onLogout }) => {
   }, [startDate, endDate]);
 
   const activeRangeLabel = useMemo(() => {
-    if (startDate === '2026-07-13' && endDate === '2026-07-20') return '7 Days';
-    if (startDate === '2026-06-20' && endDate === '2026-07-20') return '1 Month';
     if (!startDate && !endDate) return 'All Time';
-    return 'Custom Range';
+    return 'Selected Period';
   }, [startDate, endDate]);
 
   const currentRangeData = { salesLabel: 'Daily' };
@@ -52,6 +55,8 @@ const DashboardPage = ({ onLogout }) => {
     salesInvoices = [],
     serviceInvoices = [],
     creditSales = [],
+    creditPayments = [],
+    tyreExportPayments = [],
     invoiceLineItems = [],
     quickServices = [],
     exportRecords = [],
@@ -67,6 +72,8 @@ const DashboardPage = ({ onLogout }) => {
     salesInvoices,
     serviceInvoices,
     creditSales,
+    creditPayments,
+    tyreExportPayments,
     invoiceLineItems,
     quickServices,
     exportRecords,
@@ -79,6 +86,7 @@ const DashboardPage = ({ onLogout }) => {
     { key: 'all', label: 'All Operations', icon: <FiLayers /> },
     { key: 'sales', label: 'Sales', icon: <FiTrendingUp /> },
     { key: 'revenue', label: 'Revenue', icon: <FiDollarSign /> },
+    { key: 'expenses', label: 'Expenses', icon: <FiFileText /> },
     { key: 'netIncome', label: 'Net Income', icon: <FiCheckCircle /> },
     { key: 'workers', label: 'Workers', icon: <FiUser /> },
   ]
@@ -103,7 +111,6 @@ const DashboardPage = ({ onLogout }) => {
     )
   }, [inventoryRows, searchQuery])
 
-
   const salaryRows = useMemo(() => {
     const roles = workers.reduce((acc, w) => {
       const role = w.role || w.jobRole || 'Unassigned';
@@ -111,9 +118,9 @@ const DashboardPage = ({ onLogout }) => {
 
       acc[role].totalWorkers += 1;
 
-      const id = w.id;
+      const id = w.id || w.workerId;
       const monthPayments = salaryPayments
-        .filter((p) => p.worker_id === id && isWithinRange(p.paid_at || p.created_at || p.date))
+        .filter((p) => (p.worker_id === id || p.workerId === id) && isWithinRange(p.paid_at || p.paidAt || p.period_from || p.periodFrom || p.created_at || p.date))
         .reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
 
       if (monthPayments > 0) {
@@ -142,91 +149,140 @@ const DashboardPage = ({ onLogout }) => {
     )
   }, [salaryRows, searchQuery])
 
-  const totalSales = useMemo(() => {
+  const totalSalesInvoices = useMemo(() => {
     return salesInvoices
-      .filter(i => (!i.status || ['completed', 'paid'].includes(i.status.toLowerCase())) && isWithinRange(i.invoice_date || i.created_at || i.createdAt))
+      .filter(i => (!i.status || ['completed', 'paid'].includes(i.status.toLowerCase())) && isWithinRange(i.invoice_date || i.invoiceDate || i.created_at || i.createdAt))
       .reduce((sum, si) => sum + (parseFloat(si.grandTotal || si.grand_total || si.amount) || 0), 0);
   }, [salesInvoices, isWithinRange]);
 
-  const outstandingDebt = useMemo(() => {
+  const totalCreditSales = useMemo(() => {
     return creditSales
-      .filter(cs => isWithinRange(cs.sale_date || cs.created_at || cs.date))
-      .reduce((sum, cs) => sum + (parseFloat(cs.amount) || 0), 0);
+      .filter(cs => isWithinRange(cs.sale_date || cs.saleDate || cs.created_at || cs.createdAt))
+      .reduce((sum, cs) => sum + (parseFloat(cs.grand_total || cs.grandTotal || cs.sub_total || cs.amount) || 0), 0);
   }, [creditSales, isWithinRange]);
 
   const salesValue = useMemo(() => {
-    return totalSales;
-  }, [totalSales]);
+    return totalSalesInvoices + totalCreditSales;
+  }, [totalSalesInvoices, totalCreditSales]);
+
+  const outstandingDebt = useMemo(() => {
+    return creditSales
+      .reduce((sum, cs) => {
+        const grand = parseFloat(cs.grand_total || cs.grandTotal || cs.sub_total || cs.amount) || 0;
+        const cid = cs.credit_id || cs.creditId || cs.id;
+        const totalPaid = creditPayments
+          .filter(cp => (cp.credit_id === cid || cp.creditId === cid))
+          .reduce((pSum, cp) => pSum + (parseFloat(cp.amount) || 0), 0);
+        const settled = totalPaid > 0 ? totalPaid : (parseFloat(cs.settlement || cs.paid_amount) || 0);
+        const due = Math.max(0, grand - settled);
+        return sum + due;
+      }, 0);
+  }, [creditSales, creditPayments]);
 
   const serviceRevenue = useMemo(() => {
     return serviceInvoices
-      .filter(s => isWithinRange(s.service_date || s.created_at || s.date))
+      .filter(s => {
+        const invoiceId = s.invoice_id || s.invoiceId;
+        if (invoiceId && String(invoiceId).trim() !== '') return false;
+        const name = (s.name || s.description || '').trim().toLowerCase();
+        if (name === 'invoiced service' || name === 'labour' || name === 'additional parts' || name === 'labour cost' || name === 'parts cost') return false;
+        return isWithinRange(s.service_date || s.serviceDate || s.created_at || s.createdAt || s.date);
+      })
       .reduce((sum, s) => sum + (parseFloat(s.price) || 0), 0);
   }, [serviceInvoices, isWithinRange]);
 
   const quickServiceRevenue = useMemo(() => {
     return quickServices
-      .filter(qs => isWithinRange(qs.service_date || qs.created_at || qs.date))
+      .filter(qs => isWithinRange(qs.service_date || qs.serviceDate || qs.created_at || qs.createdAt))
       .reduce((sum, qs) => sum + (parseFloat(qs.price) || 0), 0);
   }, [quickServices, isWithinRange]);
 
   const tyreExportRevenue = useMemo(() => {
     return exportRecords
-      .filter(r => isWithinRange(r.export_date || r.created_at || r.date))
-      .reduce((sum, r) => sum + (parseFloat(r.total_amount) || 0), 0);
+      .filter(r => isWithinRange(r.export_date || r.exportDate || r.created_at || r.createdAt))
+      .reduce((sum, r) => {
+        const grand = parseFloat(r.grand_total || r.grandTotal || r.sub_total) || 0;
+        if (grand > 0) return sum + grand;
+        const custPrice = parseFloat(r.cust_price || r.custPrice) || 0;
+        const tyres = parseInt(r.tyres) || 0;
+        const fee = parseFloat(r.service_fee || r.serviceFee) || 0;
+        return sum + (custPrice * tyres + fee);
+      }, 0);
   }, [exportRecords, isWithinRange]);
 
   const totalRevenue = useMemo(() => {
-    return totalSales + serviceRevenue + quickServiceRevenue + tyreExportRevenue;
-  }, [totalSales, serviceRevenue, quickServiceRevenue, tyreExportRevenue]);
+    return totalSalesInvoices + totalCreditSales + serviceRevenue + quickServiceRevenue + tyreExportRevenue;
+  }, [totalSalesInvoices, totalCreditSales, serviceRevenue, quickServiceRevenue, tyreExportRevenue]);
 
   const completedInvoiceProductCost = useMemo(() => {
     return salesInvoices
-      .filter(i => (!i.status || ['completed', 'paid'].includes(i.status.toLowerCase())) && isWithinRange(i.invoice_date || i.created_at || i.createdAt))
+      .filter(i => (!i.status || ['completed', 'paid'].includes(i.status.toLowerCase())) && isWithinRange(i.invoice_date || i.invoiceDate || i.created_at || i.createdAt))
       .reduce((total, inv) => {
-        const items = inv.line_items || inv.items || inv.parts || inv.invoice_items || [];
+        let items = inv.line_items || inv.items || inv.parts || inv.invoice_items || [];
+        if (typeof items === 'string') {
+          try { items = JSON.parse(items); } catch(e) { items = []; }
+        }
         const invCost = items.reduce((sum, il) => {
-          const product = products.find(p => p.id === il.product_id);
-          const buyPrice = product ? (parseFloat(product.buy_price) || 0) : 0;
+          const pid = il.product_id || il.productId;
+          const product = products.find(p => p.id === pid);
+          const buyPrice = product ? (parseFloat(product.buy_price || product.buyPrice) || 0) : 0;
           return sum + ((parseInt(il.qty || il.quantity) || 0) * buyPrice);
         }, 0);
         return total + invCost;
       }, 0);
   }, [salesInvoices, products, isWithinRange]);
 
+  const creditSalesProductCost = useMemo(() => {
+    return creditSales
+      .filter(cs => isWithinRange(cs.sale_date || cs.saleDate || cs.created_at || cs.createdAt))
+      .reduce((total, cs) => {
+        let parts = cs.parts || [];
+        if (typeof parts === 'string') {
+          try { parts = JSON.parse(parts); } catch(e) { parts = []; }
+        }
+        const csCost = parts.reduce((sum, p) => {
+          const pid = p.product_id || p.productId;
+          const product = products.find(prod => prod.id === pid);
+          const buyPrice = product ? (parseFloat(product.buy_price || product.buyPrice) || 0) : 0;
+          return sum + ((parseInt(p.quantity || p.qty) || 0) * buyPrice);
+        }, 0);
+        return total + csCost;
+      }, 0);
+  }, [creditSales, products, isWithinRange]);
+
   const tyreExportCosts = useMemo(() => {
     return exportRecords
-      .filter(r => isWithinRange(r.export_date || r.created_at || r.date))
-      .reduce((sum, r) => sum + ((parseFloat(r.comp_price) || 0) * (parseInt(r.tyres) || 0)), 0);
+      .filter(r => isWithinRange(r.export_date || r.exportDate || r.created_at || r.createdAt))
+      .reduce((sum, r) => sum + ((parseFloat(r.comp_price || r.compPrice) || 0) * (parseInt(r.tyres) || 0)), 0);
   }, [exportRecords, isWithinRange]);
 
   const workerCosts = useMemo(() => {
     return salaryPayments
-      .filter(p => isWithinRange(p.paid_at || p.created_at || p.date))
+      .filter(p => isWithinRange(p.paid_at || p.paidAt || p.period_from || p.periodFrom || p.created_at || p.createdAt))
       .reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
   }, [salaryPayments, isWithinRange]);
 
   const totalGeneralExpenses = useMemo(() => {
     return expenses
-      .filter(e => isWithinRange(e.expense_date || e.created_at || e.date))
+      .filter(e => isWithinRange(e.expense_date || e.expenseDate || e.created_at || e.createdAt))
       .reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
   }, [expenses, isWithinRange]);
 
-  const totalCosts = useMemo(() => {
-    return totalGeneralExpenses + completedInvoiceProductCost + tyreExportCosts + workerCosts;
-  }, [totalGeneralExpenses, completedInvoiceProductCost, tyreExportCosts, workerCosts]);
+  const cogs = useMemo(() => {
+    return completedInvoiceProductCost + creditSalesProductCost + tyreExportCosts;
+  }, [completedInvoiceProductCost, creditSalesProductCost, tyreExportCosts]);
 
-  const netIncome = useMemo(() => {
-    return totalRevenue - totalCosts;
-  }, [totalRevenue, totalCosts]);
+  const totalCosts = useMemo(() => {
+    return totalGeneralExpenses + cogs + workerCosts;
+  }, [totalGeneralExpenses, cogs, workerCosts]);
 
   const grossProfit = useMemo(() => {
-    return totalRevenue - (completedInvoiceProductCost + tyreExportCosts);
-  }, [totalRevenue, completedInvoiceProductCost, tyreExportCosts]);
+    return totalRevenue - cogs;
+  }, [totalRevenue, cogs]);
 
-  const cogs = useMemo(() => {
-    return completedInvoiceProductCost + tyreExportCosts;
-  }, [completedInvoiceProductCost, tyreExportCosts]);
+  const netIncome = useMemo(() => {
+    return grossProfit - workerCosts - totalGeneralExpenses;
+  }, [grossProfit, workerCosts, totalGeneralExpenses]);
 
   const attendanceStats = useMemo(() => {
     let present = 0;
@@ -307,6 +363,7 @@ const DashboardPage = ({ onLogout }) => {
   const topStats = [
     {
       key: 'sales',
+      category: 'sales',
       icon: <FiTrendingUp className="text-indigo-500" />,
       value: `Rs. ${salesValue.toLocaleString()}`,
       trend: `${salesInvoices.length} Invs | ${creditSales.length} Credits`,
@@ -315,12 +372,21 @@ const DashboardPage = ({ onLogout }) => {
     },
     {
       key: 'cogs',
-      category: 'revenue',
+      category: 'expenses',
       icon: <FiShoppingCart className="text-rose-500" />,
       value: `Rs. ${cogs.toLocaleString()}`,
       trend: 'Cost of Inventory',
       trendType: 'warning',
       label: 'Cost of Goods Sold (COGS)'
+    },
+    {
+      key: 'expenses',
+      category: 'expenses',
+      icon: <FiFileText className="text-amber-500" />,
+      value: `Rs. ${totalGeneralExpenses.toLocaleString()}`,
+      trend: `${expenses.filter(e => isWithinRange(e.expense_date || e.expenseDate || e.created_at)).length} Expense Entries`,
+      trendType: 'warning',
+      label: 'General Expenses'
     },
     {
       key: 'grossProfit',
@@ -333,6 +399,7 @@ const DashboardPage = ({ onLogout }) => {
     },
     {
       key: 'revenue',
+      category: 'revenue',
       icon: <FiDollarSign className="text-emerald-500" />,
       value: `Rs. ${totalRevenue.toLocaleString()}`,
       trend: 'All streams active',
@@ -341,6 +408,7 @@ const DashboardPage = ({ onLogout }) => {
     },
     {
       key: 'netIncome',
+      category: 'netIncome',
       icon: <FiCheckCircle className="text-amber-500" />,
       value: `Rs. ${netIncome.toLocaleString()}`,
       trend: `Costs: Rs. ${totalCosts.toLocaleString()}`,
@@ -349,6 +417,7 @@ const DashboardPage = ({ onLogout }) => {
     },
     {
       key: 'workers',
+      category: 'expenses',
       icon: <FiUser className="text-rose-500" />,
       value: `Rs. ${workerCosts.toLocaleString()}`,
       trend: `P: ${attendanceStats.present} | H: ${attendanceStats.halfDay} | A: ${attendanceStats.absent}`,
