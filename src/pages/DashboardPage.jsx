@@ -220,7 +220,7 @@ const DashboardPage = ({ onLogout }) => {
       .reduce((total, inv) => {
         let items = inv.line_items || inv.items || inv.parts || inv.invoice_items || [];
         if (typeof items === 'string') {
-          try { items = JSON.parse(items); } catch(e) { items = []; }
+          try { items = JSON.parse(items); } catch (e) { items = []; }
         }
         const invCost = items.reduce((sum, il) => {
           const pid = il.product_id || il.productId;
@@ -238,7 +238,7 @@ const DashboardPage = ({ onLogout }) => {
       .reduce((total, cs) => {
         let parts = cs.parts || [];
         if (typeof parts === 'string') {
-          try { parts = JSON.parse(parts); } catch(e) { parts = []; }
+          try { parts = JSON.parse(parts); } catch (e) { parts = []; }
         }
         const csCost = parts.reduce((sum, p) => {
           const pid = p.product_id || p.productId;
@@ -476,28 +476,7 @@ const DashboardPage = ({ onLogout }) => {
               />
             </div>
 
-            <div className="h-6 w-px bg-slate-200"></div>
 
-            <div className="flex p-0.5 gap-1 pr-1">
-              <button
-                onClick={() => { setStartDate('2026-07-13'); setEndDate('2026-07-20'); }}
-                className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${startDate === '2026-07-13' && endDate === '2026-07-20' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-50 text-slate-500 hover:text-slate-700'}`}
-              >
-                7 Days
-              </button>
-              <button
-                onClick={() => { setStartDate('2026-06-20'); setEndDate('2026-07-20'); }}
-                className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${startDate === '2026-06-20' && endDate === '2026-07-20' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-50 text-slate-500 hover:text-slate-700'}`}
-              >
-                1 Month
-              </button>
-              <button
-                onClick={() => { setStartDate(''); setEndDate(''); }}
-                className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${!startDate && !endDate ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-50 text-slate-500 hover:text-slate-700'}`}
-              >
-                All Time
-              </button>
-            </div>
           </div>
 
           <button
