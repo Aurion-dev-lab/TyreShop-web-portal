@@ -100,26 +100,6 @@ const Layout = ({ children }) => {
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col min-w-0 overflow-y-auto max-h-screen">
-        {/* Sticky Header */}
-        <header className="sticky top-0 z-40 bg-white border-b border-slate-200 h-16 flex items-center justify-between px-6 shrink-0">
-          <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-wider">
-              Web Portal
-            </span>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-3 pl-2 group">
-              <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold">
-                AD
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-slate-700">Admin Portal</p>
-                <p className="text-[10px] text-emerald-500 font-medium uppercase tracking-wider">Online</p>
-              </div>
-            </div>
-          </div>
-        </header>
-
         {/* Dynamic Page Content */}
         <div className="flex-1 p-6 sm:p-8 max-w-7xl w-full mx-auto">
           {children}

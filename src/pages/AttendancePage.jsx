@@ -17,7 +17,7 @@ const AttendancePage = () => {
     new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
   );
   const [historyTo, setHistoryTo] = useState(new Date().toISOString().split('T')[0]);
-  
+
   const filteredHistory = useMemo(() => {
     return attendances
       .filter(a => {
@@ -52,14 +52,49 @@ const AttendancePage = () => {
     });
   }, [workers, attendances, selectedMonth]);
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 font-['Plus_Jakarta_Sans',sans-serif] text-[#111827]">
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+      `}</style>
+
       {/* Page Title */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
         <div>
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-3">
-            <FiCalendar className="text-emerald-500" /> Attendance Management
+          <h1 className="text-[28px] font-extrabold text-[#111827] tracking-tight flex items-center gap-3">
+            <span className="w-10 h-10 rounded-2xl bg-[#0D9488]/10 text-[#0D9488] flex items-center justify-center text-lg">
+              <FiCalendar />
+            </span>
+            Attendance Management
           </h1>
-          <p className="text-slate-500 mt-1 text-sm font-medium">Track and manage daily attendance records</p>
+          <p className="text-[#6B7280] mt-1.5 text-[14px]">Track and manage daily attendance records</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3 bg-white p-2 rounded-2xl border border-[#EEF0F3] shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+          <div className="relative flex-1 min-w-[200px]">
+            <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF] text-sm" />
+            <input
+              type="text"
+              value={historySearch}
+              onChange={(e) => setHistorySearch(e.target.value)}
+              placeholder="Search worker..."
+              className="pl-9 pr-4 py-2 bg-[#F9FAFB] border border-transparent rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-[#6366F1]/20 focus:border-[#6366F1] transition-all outline-none w-full"
+            />
+          </div>
+          <div className="h-6 w-px bg-[#EEF0F3] hidden sm:block"></div>
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-[#F9FAFB] rounded-xl">
+            <input
+              type="date"
+              value={historyFrom}
+              onChange={(e) => setHistoryFrom(e.target.value)}
+              className="bg-transparent text-xs font-semibold text-[#374151] outline-none cursor-pointer"
+            />
+            <span className="text-[#D1D5DB] text-xs">&mdash;</span>
+            <input
+              type="date"
+              value={historyTo}
+              onChange={(e) => setHistoryTo(e.target.value)}
+              className="bg-transparent text-xs font-semibold text-[#374151] outline-none cursor-pointer"
+            />
+          </div>
         </div>
       </div>
 
@@ -68,62 +103,41 @@ const AttendancePage = () => {
         <div className="space-y-8">
 
           {/* Attendance History Card */}
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-6 border-b border-slate-100 space-y-4">
-              <h3 className="text-lg font-bold text-slate-900">Attendance History</h3>
-              <div className="flex flex-wrap items-center gap-4">
-                <div className="relative flex-1 min-w-[200px]">
-                  <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    value={historySearch}
-                    onChange={(e) => setHistorySearch(e.target.value)}
-                    placeholder="Search worker..."
-                    className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all outline-none w-full"
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="date"
-                    value={historyFrom}
-                    onChange={(e) => setHistoryFrom(e.target.value)}
-                    className="px-3 py-1.5 border border-slate-200 rounded-xl text-xs font-semibold outline-none cursor-pointer"
-                  />
-                  <span className="text-slate-400 text-xs">to</span>
-                  <input
-                    type="date"
-                    value={historyTo}
-                    onChange={(e) => setHistoryTo(e.target.value)}
-                    className="px-3 py-1.5 border border-slate-200 rounded-xl text-xs font-semibold outline-none cursor-pointer"
-                  />
-                </div>
+          <div className="bg-white rounded-3xl border border-[#EEF0F3] shadow-[0_1px_2px_rgba(16,24,40,0.04)] overflow-hidden">
+            <div className="px-7 py-5 border-b border-[#F3F4F6] flex items-center justify-between">
+              <div>
+                <h3 className="text-[17px] font-bold text-[#111827]">Attendance History</h3>
+                <p className="text-[13px] text-[#6B7280] mt-0.5">{filteredHistory.length} record{filteredHistory.length === 1 ? '' : 's'} in range</p>
               </div>
             </div>
-            <div className="max-h-[350px] overflow-y-auto">
+            <div className="h-[calc(100vh-320px)] min-h-[420px] overflow-y-auto no-scrollbar">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-200 sticky top-0">
-                    <th className="px-6 py-3">Date</th>
-                    <th className="px-6 py-3">Worker</th>
-                    <th className="px-6 py-3 text-right">Status</th>
+                  <tr className="bg-[#F9FAFB] text-[10px] font-bold text-[#9CA3AF] uppercase tracking-widest border-b border-[#F3F4F6] sticky top-0 z-10">
+                    <th className="px-7 py-4">Date</th>
+                    <th className="px-7 py-4">Worker</th>
+                    <th className="px-7 py-4 text-center">Role</th>
+                    <th className="px-7 py-4 text-right">Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-[#F3F4F6]">
                   {filteredHistory.map((att) => {
                     const worker = workers.find(w => w.id === att.worker_id || w.id === att.worker_id);
                     return (
-                      <tr key={att.id} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="px-6 py-3 text-sm text-slate-500 font-mono">
+                      <tr key={att.id} className="hover:bg-[#FAFAFB] transition-colors">
+                        <td className="px-7 py-4 text-sm text-[#6B7280] font-medium tabular-nums">
                           {att.attendance_date}
                         </td>
-                        <td className="px-6 py-3 text-sm font-semibold text-slate-800">
+                        <td className="px-7 py-4 text-sm font-semibold text-[#111827]">
                           {worker?.name || 'Unknown Worker'}
                         </td>
-                        <td className="px-6 py-3 text-right">
-                          <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
-                            att.status?.toUpperCase() === 'PRESENT' ? 'bg-emerald-50 text-emerald-600' :
-                            att.status?.toUpperCase() === 'HALF_DAY' ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-600'
-                          }`}>
+                        <td className="px-7 py-4 text-sm text-center">
+                          <span className="px-3 py-1 bg-[#F3F4F6] text-[#6B7280] text-xs font-medium rounded-lg inline-block">{worker?.jobRole || '-'}</span>
+                        </td>
+                        <td className="px-7 py-4 text-right">
+                          <span className={`text-[10px] font-bold px-3 py-1 rounded-full inline-block uppercase tracking-wide ${att.status?.toUpperCase() === 'PRESENT' ? 'bg-[#0D9488]/10 text-[#0D9488]' :
+                              att.status?.toUpperCase() === 'HALF_DAY' ? 'bg-[#D97706]/10 text-[#B45309]' : 'bg-[#E11D48]/10 text-[#E11D48]'
+                            }`}>
                             {att.status || 'UNKNOWN'}
                           </span>
                         </td>
@@ -132,8 +146,11 @@ const AttendancePage = () => {
                   })}
                   {filteredHistory.length === 0 && (
                     <tr>
-                      <td colSpan="3" className="p-8 text-center text-slate-400 text-sm font-medium">
-                        No history records found.
+                      <td colSpan="4" className="p-16 text-center">
+                        <div className="flex flex-col items-center justify-center text-[#9CA3AF]">
+                          <FiCalendar className="text-3xl mb-3 text-[#E5E7EB]" />
+                          <span className="text-sm font-medium">No history records found.</span>
+                        </div>
                       </td>
                     </tr>
                   )}
