@@ -1,9 +1,11 @@
 import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { FiTool, FiUser, FiLock, FiArrowRight, FiAlertCircle } from 'react-icons/fi'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../hooks/useAuth'
 
 const LoginPage = () => {
-  const { login } = useAuth()
+  const { loginUser } = useAuth()
+  const navigate = useNavigate()
   const [userName, setUserName] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -14,10 +16,10 @@ const LoginPage = () => {
     setError('')
     setIsLoading(true)
     try {
-      await login({ user_name: userName, password })
-      window.location.href = '/dashboard'
+      await loginUser({ user_name: userName, password })
+      navigate('/dashboard', { replace: true })
     } catch (err) {
-      setError(err.response?.data?.message || 'Invalid credentialsss')
+      setError(err.message || 'Invalid credentials')
     } finally {
       setIsLoading(false)
     }
@@ -52,6 +54,7 @@ const LoginPage = () => {
                 <input
                   type="text"
                   required
+                  autoComplete="username"
                   value={userName}
                   onChange={(e) => setUserName(e.target.value)}
                   placeholder="admin"
@@ -67,6 +70,7 @@ const LoginPage = () => {
                 <input
                   type="password"
                   required
+                  autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
