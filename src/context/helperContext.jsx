@@ -2,20 +2,17 @@ import React, { createContext, useState, useEffect, useContext } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import {
   getProducts,
-  getProductImages,
   getWorkers,
   getAttendances,
   getWorkerCredits,
   getSalaryPayments,
   getSalaryAdvances,
   getCreditSales,
-  getCreditSaleParts,
   getExportRecords,
   getServiceInvoices,
   getQuickServices,
   getQuickServicePresets,
   getSalesInvoices,
-  getInvoiceLineItems,
   getCustomers,
   getExpenses,
   getCreditPayments,
@@ -26,17 +23,14 @@ const HelperContext = createContext();
 
 export const HelperProvider = ({ children }) => {
   const [products, setProducts] = useState([]);
-  const [productImages, setProductImages] = useState([]);
   const [workers, setWorkers] = useState([]);
   const [attendances, setAttendances] = useState([]);
   const [workerCredits, setWorkerCredits] = useState([]);
   const [salaryPayments, setSalaryPayments] = useState([]);
   const [salaryAdvances, setSalaryAdvances] = useState([]);
   const [creditSales, setCreditSales] = useState([]);
-  const [creditSaleParts, setCreditSaleParts] = useState([]);
   const [exportRecords, setExportRecords] = useState([]);
   const [salesInvoices, setSalesInvoices] = useState([]);
-  const [invoiceLineItems, setInvoiceLineItems] = useState([]);
   const [serviceInvoices, setServiceInvoices] = useState([]);
   const [quickServices, setQuickServices] = useState([]);
   const [quickServicePresets, setQuickServicePresets] = useState([]);
@@ -54,17 +48,14 @@ export const HelperProvider = ({ children }) => {
     try {
       const [
         productsRes,
-        productImagesRes,
         workersRes,
         attendancesRes,
         workerCreditsRes,
         salaryPaymentsRes,
         salaryAdvancesRes,
         creditSalesRes,
-        creditSalePartsRes,
         exportRecordsRes,
         salesInvoicesRes,
-        invoiceLineItemsRes,
         serviceInvoicesRes,
         quickServicesRes,
         quickServicePresetsRes,
@@ -74,17 +65,14 @@ export const HelperProvider = ({ children }) => {
         tyreExportPaymentsRes
       ] = await Promise.all([
         getProducts().catch(() => null),
-        getProductImages().catch(() => null),
         getWorkers().catch(() => null),
         getAttendances().catch(() => null),
         getWorkerCredits().catch(() => null),
         getSalaryPayments().catch(() => null),
         getSalaryAdvances().catch(() => null),
         getCreditSales().catch(() => null),
-        getCreditSaleParts().catch(() => null),
         getExportRecords().catch(() => null),
         getSalesInvoices().catch(() => null),
-        getInvoiceLineItems().catch(() => null),
         getServiceInvoices().catch(() => null),
         getQuickServices().catch(() => null),
         getQuickServicePresets().catch(() => null),
@@ -122,12 +110,10 @@ export const HelperProvider = ({ children }) => {
       const attendancesData = attendancesRes?.data?.data || attendancesRes?.data || [];
       if (Array.isArray(attendancesData)) setAttendances(attendancesData);
       else if (attendancesRes?.data?.status === 'success') setAttendances(attendancesRes.data.data || []);
-      if (productImagesRes?.data?.status === 'success') setProductImages(productImagesRes.data.data || []);
       if (workerCreditsRes?.data?.status === 'success') setWorkerCredits(workerCreditsRes.data.data || []);
       if (salaryPaymentsRes?.data?.status === 'success') setSalaryPayments(salaryPaymentsRes.data.data || []);
       if (salaryAdvancesRes?.data?.status === 'success') setSalaryAdvances(salaryAdvancesRes.data.data || []);
       if (creditSalesRes?.data?.status === 'success') setCreditSales(creditSalesRes.data.data || []);
-      if (creditSalePartsRes?.data?.status === 'success') setCreditSaleParts(creditSalePartsRes.data.data || []);
       if (exportRecordsRes?.data?.status === 'success') setExportRecords(exportRecordsRes.data.data || []);
 
       if (salesInvoicesRes?.data?.status === 'success') {
@@ -137,7 +123,6 @@ export const HelperProvider = ({ children }) => {
         }));
         setSalesInvoices(mappedInvoices);
       }
-      if (invoiceLineItemsRes?.data?.status === 'success') setInvoiceLineItems(invoiceLineItemsRes.data.data || []);
       if (quickServicesRes?.data?.status === 'success') setQuickServices(quickServicesRes.data.data || []);
       if (quickServicePresetsRes?.data?.status === 'success') setQuickServicePresets(quickServicePresetsRes.data.data || []);
       if (customersRes?.data?.status === 'success') setCustomers(customersRes.data.data || []);
@@ -176,17 +161,14 @@ export const HelperProvider = ({ children }) => {
   return (
     <HelperContext.Provider value={{
       products,
-      productImages,
       workers,
       attendances,
       workerCredits,
       salaryPayments,
       salaryAdvances,
       creditSales,
-      creditSaleParts,
       exportRecords,
       salesInvoices,
-      invoiceLineItems,
       serviceInvoices,
       quickServices,
       quickServicePresets,

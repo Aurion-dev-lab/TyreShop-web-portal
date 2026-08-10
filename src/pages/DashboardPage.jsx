@@ -54,7 +54,6 @@ const DashboardPage = () => {
     creditSales = [],
     creditPayments = [],
     tyreExportPayments = [],
-    invoiceLineItems = [],
     quickServices = [],
     exportRecords = [],
     expenses = [],

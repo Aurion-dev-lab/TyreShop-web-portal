@@ -28,10 +28,24 @@ export const AuthProvider = ({ children }) => {
     setAT(null);
   };
 
+  const refreshAccessToken = () => {
+    if (!refreshPromise) {
+      refreshPromise = api
+        .post('/auth/refresh-token')
+        .then((response) => setAT(response.data.data.accessToken))
+        .finally(() => { refreshPromise = null; });
+    }
+    return refreshPromise;
+  };
+
   useLayoutEffect(() => {
     const req = api.interceptors.request.use((config) => {
       const at = getAT();
-      if (at && !config.headers.Authorization) {
+      const isRefreshRequest = config.url?.includes('/auth/refresh-token');
+      if (isRefreshRequest) {
+        config.headers.delete?.('Authorization');
+        delete config.headers.Authorization;
+      } else if (at && !config.headers.Authorization) {
         config.headers.Authorization = `Bearer ${at}`;
       }
       return config;
@@ -46,13 +60,8 @@ export const AuthProvider = ({ children }) => {
         if (error.response?.status === 401 && !orig?._retry && !isAuth) {
           orig._retry = true;
           try {
-            if (!refreshPromise) {
-              refreshPromise = api
-                .post('/auth/refresh-token')
-                .then((r) => { setAT(r.data.data.accessToken); })
-                .finally(() => { refreshPromise = null; });
-            }
-            await refreshPromise;
+            await refreshAccessToken();
+            orig.headers.Authorization = `Bearer ${getAT()}`;
             return api(orig);
           } catch {
             resetAuth();
@@ -69,19 +78,38 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    if (!getAT()) { setLoading(false); return; }
+    const restoreSession = async () => {
+      try {
+        let response;
+        if (getAT()) {
+          try {
+            response = await api.get('/auth/me');
+          } catch {
+            // The access token may have expired; use the HttpOnly refresh cookie below.
+          }
+        }
 
-    api.get('/auth/me')
-      .then((u) => { setUser(u.data.data); setIsAuthenticated(true); })
-      .catch(resetAuth)
-      .finally(() => setLoading(false));
+        if (!response) {
+          await refreshAccessToken();
+          response = await api.get('/auth/me');
+        }
+
+        setUser(response.data.data);
+        setIsAuthenticated(true);
+      } catch {
+        resetAuth();
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    restoreSession();
   }, []);
 
   useEffect(() => {
     if (!isAuthenticated) return;
     const id = setInterval(() => {
-      api.post('/auth/refresh-token')
-        .then((r) => setAT(r.data.data.accessToken))
+      refreshAccessToken()
         .catch(resetAuth);
     }, 1000 * 60 * 9);
     return () => clearInterval(id);
@@ -90,8 +118,15 @@ export const AuthProvider = ({ children }) => {
   const loginUser = async (credentials) => {
     try {
       const { data } = await api.post('/auth/login', credentials);
-      setAT(data.data.accessToken);
-      const u = await api.get('/auth/me');
+      const accessToken = data?.data?.accessToken;
+      if (!accessToken) {
+        throw new Error('Login did not return an access token');
+      }
+
+      setAT(accessToken);
+      const u = await api.get('/auth/me', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
       setUser(u.data.data);
       setIsAuthenticated(true);
       return u.data.data;
