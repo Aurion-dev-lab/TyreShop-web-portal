@@ -14,15 +14,12 @@ import {
   FiShoppingCart,
   FiFileText,
 } from 'react-icons/fi'
-import { rangeOptions, rangeMetrics } from '../data/metrics.jsx'
 import { useHelper } from '../context/helperContext.jsx'
 import * as XLSX from 'xlsx'
-import { useAuth } from '../context/AuthContext.jsx'
 
-const DashboardPage = ({ onLogout }) => {
+const DashboardPage = () => {
   const navigate = useNavigate()
   const helperData = useHelper()
-  const { logout } = useAuth()
 
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
@@ -65,22 +62,6 @@ const DashboardPage = ({ onLogout }) => {
     attendances = [],
     isLoading
   } = helperData;
-
-  console.log("helperData", {
-    products,
-    workers,
-    salesInvoices,
-    serviceInvoices,
-    creditSales,
-    creditPayments,
-    tyreExportPayments,
-    invoiceLineItems,
-    quickServices,
-    exportRecords,
-    expenses,
-    salaryPayments,
-    attendances,
-  });
 
   const categoryOptions = [
     { key: 'all', label: 'All Operations', icon: <FiLayers /> },

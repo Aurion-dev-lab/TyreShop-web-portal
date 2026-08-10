@@ -18,9 +18,6 @@ const InventoryPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
 
-  console.log(products);
-  
-
   // Stats calculations
   const totalProducts = products.length;
   const unitsInStock = products.reduce((sum, p) => sum + (parseInt(p.stock) || 0), 0);

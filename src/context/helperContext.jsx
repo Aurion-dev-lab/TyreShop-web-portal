@@ -1,4 +1,5 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
+import { useAuth } from '../hooks/useAuth';
 import {
   getProducts,
   getProductImages,
@@ -46,7 +47,7 @@ export const HelperProvider = ({ children }) => {
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-
+  const {isAuthenticated} = useAuth();
   const fetchAllData = async () => {
     setIsLoading(true);
     setError(null);
@@ -169,8 +170,8 @@ export const HelperProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    fetchAllData();
-  }, []);
+    if (isAuthenticated) fetchAllData();
+  }, [isAuthenticated]);
 
   return (
     <HelperContext.Provider value={{

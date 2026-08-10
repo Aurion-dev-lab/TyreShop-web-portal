@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
 import {
   FiGrid,
   FiCalendar,
@@ -19,9 +18,10 @@ import {
   FiChevronRight,
   FiSettings
 } from 'react-icons/fi';
+import { useAuth } from '../hooks/useAuth';
 
 const Layout = ({ children }) => {
-  const { logout } = useAuth();
+  const { logoutUser } = useAuth();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
 
@@ -89,7 +89,7 @@ const Layout = ({ children }) => {
 
           {/* Sign Out */}
           <button
-            onClick={logout}
+            onClick={logoutUser}
             className="w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold text-rose-400 hover:text-rose-300 transition-colors cursor-pointer"
           >
             <FiLogOut className="text-base shrink-0" />
