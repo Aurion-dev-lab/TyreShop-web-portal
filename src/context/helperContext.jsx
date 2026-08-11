@@ -1,88 +1,85 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
+import { useAuth } from '../hooks/useAuth';
 import {
   getProducts,
-  getProductImages,
   getWorkers,
   getAttendances,
   getWorkerCredits,
   getSalaryPayments,
   getSalaryAdvances,
   getCreditSales,
-  getCreditSaleParts,
   getExportRecords,
   getServiceInvoices,
   getQuickServices,
   getQuickServicePresets,
   getSalesInvoices,
-  getInvoiceLineItems,
   getCustomers,
-  getExpenses
+  getExpenses,
+  getCreditPayments,
+  getTyreExportPayments
 } from '../api/api.js';
 
 const HelperContext = createContext();
 
 export const HelperProvider = ({ children }) => {
   const [products, setProducts] = useState([]);
-  const [productImages, setProductImages] = useState([]);
   const [workers, setWorkers] = useState([]);
   const [attendances, setAttendances] = useState([]);
   const [workerCredits, setWorkerCredits] = useState([]);
   const [salaryPayments, setSalaryPayments] = useState([]);
   const [salaryAdvances, setSalaryAdvances] = useState([]);
   const [creditSales, setCreditSales] = useState([]);
-  const [creditSaleParts, setCreditSaleParts] = useState([]);
   const [exportRecords, setExportRecords] = useState([]);
   const [salesInvoices, setSalesInvoices] = useState([]);
-  const [invoiceLineItems, setInvoiceLineItems] = useState([]);
   const [serviceInvoices, setServiceInvoices] = useState([]);
   const [quickServices, setQuickServices] = useState([]);
   const [quickServicePresets, setQuickServicePresets] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [expenses, setExpenses] = useState([]);
+  const [creditPayments, setCreditPayments] = useState([]);
+  const [tyreExportPayments, setTyreExportPayments] = useState([]);
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-
+  const {isAuthenticated} = useAuth();
   const fetchAllData = async () => {
     setIsLoading(true);
     setError(null);
     try {
       const [
         productsRes,
-        productImagesRes,
         workersRes,
         attendancesRes,
         workerCreditsRes,
         salaryPaymentsRes,
         salaryAdvancesRes,
         creditSalesRes,
-        creditSalePartsRes,
         exportRecordsRes,
         salesInvoicesRes,
-        invoiceLineItemsRes,
         serviceInvoicesRes,
         quickServicesRes,
         quickServicePresetsRes,
         customersRes,
-        expensesRes
+        expensesRes,
+        creditPaymentsRes,
+        tyreExportPaymentsRes
       ] = await Promise.all([
-        getProducts(),
-        getProductImages(),
-        getWorkers(),
-        getAttendances(),
-        getWorkerCredits(),
-        getSalaryPayments(),
-        getSalaryAdvances(),
-        getCreditSales(),
-        getCreditSaleParts(),
-        getExportRecords(),
-        getSalesInvoices(),
-        getInvoiceLineItems(),
-        getServiceInvoices(),
-        getQuickServices(),
-        getQuickServicePresets(),
-        getCustomers(),
-        getExpenses()
+        getProducts().catch(() => null),
+        getWorkers().catch(() => null),
+        getAttendances().catch(() => null),
+        getWorkerCredits().catch(() => null),
+        getSalaryPayments().catch(() => null),
+        getSalaryAdvances().catch(() => null),
+        getCreditSales().catch(() => null),
+        getExportRecords().catch(() => null),
+        getSalesInvoices().catch(() => null),
+        getServiceInvoices().catch(() => null),
+        getQuickServices().catch(() => null),
+        getQuickServicePresets().catch(() => null),
+        getCustomers().catch(() => null),
+        getExpenses().catch(() => null),
+        getCreditPayments().catch(() => null),
+        getTyreExportPayments().catch(() => null)
       ]);
 
       if (productsRes?.data?.status === 'success') {
@@ -93,28 +90,30 @@ export const HelperProvider = ({ children }) => {
           minStock: p.minimum_stock_alert || 5,
         }));
         setProducts(mappedProducts);
-      }
+      }      
 
       if (workersRes?.data?.status === 'success') {
         const mappedWorkers = (workersRes.data.data || []).map(w => ({
           ...w,
+          id: w.id,
           workerId: w.id,
           name: w.name,
-          jobRole: w.role,
-          telephone: w.phone,
-          salaryType: w.salary_type || 'Monthly',
+          jobRole: w.role || w.jobRole,
+          role: w.role || w.jobRole,
+          telephone: w.phone || w.telephone,
+          salaryType: w.salary_type || w.salaryType || 'Monthly',
           rate: w.rate ? parseFloat(w.rate) : 0,
         }));
         setWorkers(mappedWorkers);
       }
 
-      if (attendancesRes?.data?.status === 'success') setAttendances(attendancesRes.data.data || []);
-      if (productImagesRes?.data?.status === 'success') setProductImages(productImagesRes.data.data || []);
+      const attendancesData = attendancesRes?.data?.data || attendancesRes?.data || [];
+      if (Array.isArray(attendancesData)) setAttendances(attendancesData);
+      else if (attendancesRes?.data?.status === 'success') setAttendances(attendancesRes.data.data || []);
       if (workerCreditsRes?.data?.status === 'success') setWorkerCredits(workerCreditsRes.data.data || []);
       if (salaryPaymentsRes?.data?.status === 'success') setSalaryPayments(salaryPaymentsRes.data.data || []);
       if (salaryAdvancesRes?.data?.status === 'success') setSalaryAdvances(salaryAdvancesRes.data.data || []);
       if (creditSalesRes?.data?.status === 'success') setCreditSales(creditSalesRes.data.data || []);
-      if (creditSalePartsRes?.data?.status === 'success') setCreditSaleParts(creditSalePartsRes.data.data || []);
       if (exportRecordsRes?.data?.status === 'success') setExportRecords(exportRecordsRes.data.data || []);
 
       if (salesInvoicesRes?.data?.status === 'success') {
@@ -124,11 +123,12 @@ export const HelperProvider = ({ children }) => {
         }));
         setSalesInvoices(mappedInvoices);
       }
-      if (invoiceLineItemsRes?.data?.status === 'success') setInvoiceLineItems(invoiceLineItemsRes.data.data || []);
       if (quickServicesRes?.data?.status === 'success') setQuickServices(quickServicesRes.data.data || []);
       if (quickServicePresetsRes?.data?.status === 'success') setQuickServicePresets(quickServicePresetsRes.data.data || []);
       if (customersRes?.data?.status === 'success') setCustomers(customersRes.data.data || []);
       if (expensesRes?.data?.status === 'success') setExpenses(expensesRes.data.data || []);
+      if (creditPaymentsRes?.data?.status === 'success') setCreditPayments(creditPaymentsRes.data.data || []);
+      if (tyreExportPaymentsRes?.data?.status === 'success') setTyreExportPayments(tyreExportPaymentsRes.data.data || []);
 
       if (serviceInvoicesRes?.data?.status === 'success') {
         const mappedServices = (serviceInvoicesRes.data.data || []).map(s => ({
@@ -155,28 +155,27 @@ export const HelperProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    fetchAllData();
-  }, []);
+    if (isAuthenticated) fetchAllData();
+  }, [isAuthenticated]);
 
   return (
     <HelperContext.Provider value={{
       products,
-      productImages,
       workers,
       attendances,
       workerCredits,
       salaryPayments,
       salaryAdvances,
       creditSales,
-      creditSaleParts,
       exportRecords,
       salesInvoices,
-      invoiceLineItems,
       serviceInvoices,
       quickServices,
       quickServicePresets,
       customers,
       expenses,
+      creditPayments,
+      tyreExportPayments,
       isLoading,
       error,
       fetchAllData

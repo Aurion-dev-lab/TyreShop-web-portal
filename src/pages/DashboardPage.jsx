@@ -1,61 +1,72 @@
 import React, { useMemo, useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  FiBox,
   FiCheckCircle,
   FiDollarSign,
   FiTool,
   FiTrendingUp,
-  FiSearch,
-  FiBell,
   FiUser,
   FiChevronRight,
   FiDownload,
   FiCalendar,
   FiLayers,
+  FiPieChart,
+  FiShoppingCart,
+  FiFileText,
 } from 'react-icons/fi'
-import { rangeOptions, rangeMetrics } from '../data/metrics.jsx'
 import { useHelper } from '../context/helperContext.jsx'
 import * as XLSX from 'xlsx'
-import { useAuth } from '../context/AuthContext.jsx'
 
-const DashboardPage = ({ onLogout }) => {
+const DashboardPage = () => {
   const navigate = useNavigate()
   const helperData = useHelper()
-  const {logout} = useAuth()
 
-  const [activeRange, setActiveRange] = useState('daily')
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return d.toISOString().split('T')[0];
+  })
+  const [endDate, setEndDate] = useState(() => new Date().toISOString().split('T')[0])
   const [activeCategory, setActiveCategory] = useState('all')
   const [isGenerating, setIsGenerating] = useState(false)
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
   const [searchQuery, setSearchQuery] = useState('')
 
-  const currentRangeData = rangeMetrics[activeRange]
+  const isWithinRange = React.useCallback((dateStr) => {
+    if (!dateStr) return true;
+    const d = dateStr.split('T')[0];
+    if (startDate && d < startDate) return false;
+    if (endDate && d > endDate) return false;
+    return true;
+  }, [startDate, endDate]);
 
-  const activeRangeLabel = useMemo(
-    () => rangeOptions.find((range) => range.key === activeRange)?.label,
-    [activeRange],
-  )
+  const activeRangeLabel = useMemo(() => {
+    if (!startDate && !endDate) return 'All Time';
+    return 'Selected Period';
+  }, [startDate, endDate]);
 
-  const { 
-    products = [], 
-    workers = [], 
-    salesInvoices = [], 
-    serviceInvoices = [], 
-    creditSales = [], 
-    invoiceLineItems = [],
+  const currentRangeData = { salesLabel: 'Daily' };
+
+  const {
+    products = [],
+    workers = [],
+    salesInvoices = [],
+    serviceInvoices = [],
+    creditSales = [],
+    creditPayments = [],
+    tyreExportPayments = [],
     quickServices = [],
     exportRecords = [],
     expenses = [],
     salaryPayments = [],
     attendances = [],
-    isLoading 
+    isLoading
   } = helperData;
 
   const categoryOptions = [
     { key: 'all', label: 'All Operations', icon: <FiLayers /> },
     { key: 'sales', label: 'Sales', icon: <FiTrendingUp /> },
     { key: 'revenue', label: 'Revenue', icon: <FiDollarSign /> },
+    { key: 'expenses', label: 'Expenses', icon: <FiFileText /> },
     { key: 'netIncome', label: 'Net Income', icon: <FiCheckCircle /> },
     { key: 'workers', label: 'Workers', icon: <FiUser /> },
   ]
@@ -80,42 +91,37 @@ const DashboardPage = ({ onLogout }) => {
     )
   }, [inventoryRows, searchQuery])
 
-  const servicesRows = useMemo(() => {
-    const groups = serviceInvoices.reduce((acc, inv) => {
-      acc[inv.description] = (acc[inv.description] || 0) + 1
-      return acc
-    }, {})
-    return Object.keys(groups).map(desc => {
-      const count = groups[desc]
-      return {
-        service: desc,
-        count: count,
-        target: count + 5,
-        status: count > 2 ? 'Ahead' : 'Normal'
-      }
-    })
-  }, [serviceInvoices])
-
-  const filteredServices = useMemo(() => {
-    return servicesRows.filter(row =>
-      row.service.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-  }, [servicesRows, searchQuery])
-
   const salaryRows = useMemo(() => {
     const roles = workers.reduce((acc, w) => {
-      if (!acc[w.jobRole]) acc[w.jobRole] = { count: 0, amount: 0 }
-      acc[w.jobRole].count += 1
-      acc[w.jobRole].amount += (w.rate || 0)
-      return acc
-    }, {})
+      const role = w.role || w.jobRole || 'Unassigned';
+      if (!acc[role]) acc[role] = { totalWorkers: 0, paidWorkers: 0, totalPaidAmount: 0 };
+
+      acc[role].totalWorkers += 1;
+
+      const id = w.id || w.workerId;
+      const monthPayments = salaryPayments
+        .filter((p) => (p.worker_id === id || p.workerId === id) && isWithinRange(p.paid_at || p.paidAt || p.period_from || p.periodFrom || p.created_at || p.date))
+        .reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+
+      if (monthPayments > 0) {
+        acc[role].paidWorkers += 1;
+        acc[role].totalPaidAmount += monthPayments;
+      }
+
+      return acc;
+    }, {});
+
     return Object.keys(roles).map(role => ({
       team: role,
-      paid: roles[role].count,
-      total: roles[role].count,
-      amount: 'Rs. ' + roles[role].amount.toLocaleString()
-    }))
-  }, [workers])
+      paid: roles[role].paidWorkers,
+      total: roles[role].totalWorkers,
+      amount: 'Rs. ' + roles[role].totalPaidAmount.toLocaleString()
+    }));
+  }, [workers, salaryPayments, isWithinRange]);
+
+  const totalPaidWorkers = useMemo(() => {
+    return salaryRows.reduce((sum, r) => sum + r.paid, 0);
+  }, [salaryRows]);
 
   const filteredSalary = useMemo(() => {
     return salaryRows.filter(row =>
@@ -123,111 +129,190 @@ const DashboardPage = ({ onLogout }) => {
     )
   }, [salaryRows, searchQuery])
 
-  // --- Real-time Financial Calculations (matching K-Line Backend/Frontend logic) ---
-  const totalSales = useMemo(() => {
-    const completedInvoiceIds = new Set(
-      salesInvoices
-        .filter(i => i.status?.toLowerCase() === 'completed')
-        .map(i => i.id || i.invoiceId)
-    );
-    return invoiceLineItems
-      .filter(il => completedInvoiceIds.has(il.invoice_id))
-      .reduce((sum, il) => sum + (parseFloat(il.total) || 0), 0);
-  }, [invoiceLineItems, salesInvoices]);
+  const totalSalesInvoices = useMemo(() => {
+    return salesInvoices
+      .filter(i => (!i.status || ['completed', 'paid'].includes(i.status.toLowerCase())) && isWithinRange(i.invoice_date || i.invoiceDate || i.created_at || i.createdAt))
+      .reduce((sum, si) => sum + (parseFloat(si.grandTotal || si.grand_total || si.amount) || 0), 0);
+  }, [salesInvoices, isWithinRange]);
 
   const totalCreditSales = useMemo(() => {
-    return creditSales.reduce((sum, cs) => sum + (parseFloat(cs.amount) || 0), 0);
-  }, [creditSales]);
+    return creditSales
+      .filter(cs => isWithinRange(cs.sale_date || cs.saleDate || cs.created_at || cs.createdAt))
+      .reduce((sum, cs) => sum + (parseFloat(cs.grand_total || cs.grandTotal || cs.sub_total || cs.amount) || 0), 0);
+  }, [creditSales, isWithinRange]);
 
   const salesValue = useMemo(() => {
-    return totalSales + totalCreditSales;
-  }, [totalSales, totalCreditSales]);
+    return totalSalesInvoices + totalCreditSales;
+  }, [totalSalesInvoices, totalCreditSales]);
+
+  const outstandingDebt = useMemo(() => {
+    return creditSales
+      .reduce((sum, cs) => {
+        const grand = parseFloat(cs.grand_total || cs.grandTotal || cs.sub_total || cs.amount) || 0;
+        const cid = cs.credit_id || cs.creditId || cs.id;
+        const totalPaid = creditPayments
+          .filter(cp => (cp.credit_id === cid || cp.creditId === cid))
+          .reduce((pSum, cp) => pSum + (parseFloat(cp.amount) || 0), 0);
+        const settled = totalPaid > 0 ? totalPaid : (parseFloat(cs.settlement || cs.paid_amount) || 0);
+        const due = Math.max(0, grand - settled);
+        return sum + due;
+      }, 0);
+  }, [creditSales, creditPayments]);
 
   const serviceRevenue = useMemo(() => {
-    return serviceInvoices.reduce((sum, s) => sum + (parseFloat(s.price) || 0), 0);
-  }, [serviceInvoices]);
+    return serviceInvoices
+      .filter(s => {
+        const invoiceId = s.invoice_id || s.invoiceId;
+        if (invoiceId && String(invoiceId).trim() !== '') return false;
+        const name = (s.name || s.description || '').trim().toLowerCase();
+        if (name === 'invoiced service' || name === 'labour' || name === 'additional parts' || name === 'labour cost' || name === 'parts cost') return false;
+        return isWithinRange(s.service_date || s.serviceDate || s.created_at || s.createdAt || s.date);
+      })
+      .reduce((sum, s) => sum + (parseFloat(s.price) || 0), 0);
+  }, [serviceInvoices, isWithinRange]);
 
   const quickServiceRevenue = useMemo(() => {
-    return quickServices.reduce((sum, qs) => sum + (parseFloat(qs.price) || 0), 0);
-  }, [quickServices]);
+    return quickServices
+      .filter(qs => isWithinRange(qs.service_date || qs.serviceDate || qs.created_at || qs.createdAt))
+      .reduce((sum, qs) => sum + (parseFloat(qs.price) || 0), 0);
+  }, [quickServices, isWithinRange]);
 
   const tyreExportRevenue = useMemo(() => {
-    return exportRecords.reduce((sum, r) => sum + (parseFloat(r.total_amount) || 0), 0);
-  }, [exportRecords]);
+    return exportRecords
+      .filter(r => isWithinRange(r.export_date || r.exportDate || r.created_at || r.createdAt))
+      .reduce((sum, r) => {
+        const grand = parseFloat(r.grand_total || r.grandTotal || r.sub_total) || 0;
+        if (grand > 0) return sum + grand;
+        const custPrice = parseFloat(r.cust_price || r.custPrice) || 0;
+        const tyres = parseInt(r.tyres) || 0;
+        const fee = parseFloat(r.service_fee || r.serviceFee) || 0;
+        return sum + (custPrice * tyres + fee);
+      }, 0);
+  }, [exportRecords, isWithinRange]);
 
   const totalRevenue = useMemo(() => {
-    return totalSales + totalCreditSales + serviceRevenue + quickServiceRevenue + tyreExportRevenue;
-  }, [totalSales, totalCreditSales, serviceRevenue, quickServiceRevenue, tyreExportRevenue]);
+    return totalSalesInvoices + totalCreditSales + serviceRevenue + quickServiceRevenue + tyreExportRevenue;
+  }, [totalSalesInvoices, totalCreditSales, serviceRevenue, quickServiceRevenue, tyreExportRevenue]);
 
   const completedInvoiceProductCost = useMemo(() => {
-    const completedInvoiceIds = new Set(
-      salesInvoices
-        .filter(i => i.status?.toLowerCase() === 'completed')
-        .map(i => i.id || i.invoiceId)
-    );
-    return invoiceLineItems
-      .filter(il => completedInvoiceIds.has(il.invoice_id))
-      .reduce((sum, il) => {
-        const product = products.find(p => p.id === il.product_id);
-        const buyPrice = product ? (parseFloat(product.buy_price) || 0) : 0;
-        return sum + ((parseInt(il.qty) || 0) * buyPrice);
+    return salesInvoices
+      .filter(i => (!i.status || ['completed', 'paid'].includes(i.status.toLowerCase())) && isWithinRange(i.invoice_date || i.invoiceDate || i.created_at || i.createdAt))
+      .reduce((total, inv) => {
+        let items = inv.line_items || inv.items || inv.parts || inv.invoice_items || [];
+        if (typeof items === 'string') {
+          try { items = JSON.parse(items); } catch (e) { items = []; }
+        }
+        const invCost = items.reduce((sum, il) => {
+          const pid = il.product_id || il.productId;
+          const product = products.find(p => p.id === pid);
+          const buyPrice = product ? (parseFloat(product.buy_price || product.buyPrice) || 0) : 0;
+          return sum + ((parseInt(il.qty || il.quantity) || 0) * buyPrice);
+        }, 0);
+        return total + invCost;
       }, 0);
-  }, [invoiceLineItems, salesInvoices, products]);
+  }, [salesInvoices, products, isWithinRange]);
+
+  const creditSalesProductCost = useMemo(() => {
+    return creditSales
+      .filter(cs => isWithinRange(cs.sale_date || cs.saleDate || cs.created_at || cs.createdAt))
+      .reduce((total, cs) => {
+        let parts = cs.parts || [];
+        if (typeof parts === 'string') {
+          try { parts = JSON.parse(parts); } catch (e) { parts = []; }
+        }
+        const csCost = parts.reduce((sum, p) => {
+          const pid = p.product_id || p.productId;
+          const product = products.find(prod => prod.id === pid);
+          const buyPrice = product ? (parseFloat(product.buy_price || product.buyPrice) || 0) : 0;
+          return sum + ((parseInt(p.quantity || p.qty) || 0) * buyPrice);
+        }, 0);
+        return total + csCost;
+      }, 0);
+  }, [creditSales, products, isWithinRange]);
 
   const tyreExportCosts = useMemo(() => {
-    return exportRecords.reduce((sum, r) => sum + ((parseFloat(r.comp_price) || 0) * (parseInt(r.tyres) || 0)), 0);
-  }, [exportRecords]);
+    return exportRecords
+      .filter(r => isWithinRange(r.export_date || r.exportDate || r.created_at || r.createdAt))
+      .reduce((sum, r) => sum + ((parseFloat(r.comp_price || r.compPrice) || 0) * (parseInt(r.tyres) || 0)), 0);
+  }, [exportRecords, isWithinRange]);
 
   const workerCosts = useMemo(() => {
-    return salaryPayments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
-  }, [salaryPayments]);
+    return salaryPayments
+      .filter(p => isWithinRange(p.paid_at || p.paidAt || p.period_from || p.periodFrom || p.created_at || p.createdAt))
+      .reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+  }, [salaryPayments, isWithinRange]);
 
   const totalGeneralExpenses = useMemo(() => {
-    return expenses.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
-  }, [expenses]);
+    return expenses
+      .filter(e => isWithinRange(e.expense_date || e.expenseDate || e.created_at || e.createdAt))
+      .reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+  }, [expenses, isWithinRange]);
+
+  const cogs = useMemo(() => {
+    return completedInvoiceProductCost + creditSalesProductCost + tyreExportCosts;
+  }, [completedInvoiceProductCost, creditSalesProductCost, tyreExportCosts]);
 
   const totalCosts = useMemo(() => {
-    return totalGeneralExpenses + completedInvoiceProductCost + tyreExportCosts + workerCosts;
-  }, [totalGeneralExpenses, completedInvoiceProductCost, tyreExportCosts, workerCosts]);
+    return totalGeneralExpenses + cogs + workerCosts;
+  }, [totalGeneralExpenses, cogs, workerCosts]);
+
+  const grossProfit = useMemo(() => {
+    return totalRevenue - cogs;
+  }, [totalRevenue, cogs]);
 
   const netIncome = useMemo(() => {
-    return totalRevenue - totalCosts;
-  }, [totalRevenue, totalCosts]);
+    return grossProfit - workerCosts - totalGeneralExpenses;
+  }, [grossProfit, workerCosts, totalGeneralExpenses]);
 
   const attendanceStats = useMemo(() => {
     let present = 0;
     let halfDay = 0;
     let absent = 0;
     attendances.forEach(a => {
+      if (!isWithinRange(a.date || a.attendance_date || a.created_at)) return;
       const status = a.status?.toUpperCase();
       if (status === 'PRESENT') present++;
       else if (status === 'HALF_DAY') halfDay++;
       else if (status === 'ABSENT') absent++;
     });
     return { present, halfDay, absent };
-  }, [attendances]);
+  }, [attendances, isWithinRange]);
 
   const salesChartData = useMemo(() => {
     const dailySales = {};
     const allInvoices = [
-      ...salesInvoices.map(i => ({ date: i.createdAt?.split('T')[0], amount: i.grandTotal || 0 })),
-      ...creditSales.map(i => ({ date: i.date?.split('T')[0], amount: i.amount || 0 }))
+      ...salesInvoices.filter(i => isWithinRange(i.invoice_date || i.created_at || i.createdAt)).map(i => ({ date: (i.invoice_date || i.createdAt || i.created_at)?.split('T')[0], amount: i.grandTotal || i.grand_total || i.amount || 0 }))
     ];
-    
+
     allInvoices.forEach(inv => {
       if (!inv.date) return;
       if (!dailySales[inv.date]) dailySales[inv.date] = 0;
       dailySales[inv.date] += inv.amount;
     });
-    
+
     const sortedDates = Object.keys(dailySales).sort();
-    let dataPoints = sortedDates.slice(-7).map(d => dailySales[d]);
-    if (dataPoints.length === 0) dataPoints = [20, 40, 60, 40, 80, 50, 90]; 
+    let dataPoints = sortedDates.map(d => dailySales[d]);
+    if (dataPoints.length === 0) dataPoints = [20, 40, 60, 40, 80, 50, 90];
     if (dataPoints.length < 2) dataPoints = [0, ...dataPoints];
-    
+
     const maxSale = Math.max(...dataPoints, 1);
     return dataPoints.map(val => Math.round((val / maxSale) * 100));
-  }, [salesInvoices, creditSales]);
+  }, [salesInvoices, isWithinRange]);
+
+  const recentSales = useMemo(() => {
+    const all = [
+      ...salesInvoices.filter(si => isWithinRange(si.invoice_date || si.created_at || si.createdAt)).map(si => ({
+        id: `si_${si.id}`,
+        invoiceId: si.invoice_id || si.id,
+        customer: si.customer || 'Walk-in Customer',
+        type: 'Sale',
+        amount: parseFloat(si.grand_total || si.amount || 0),
+        date: si.invoice_date || si.created_at?.split('T')[0] || '-',
+        status: si.status || 'PAID'
+      }))
+    ];
+    return all.sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5); // top 5 recent
+  }, [salesInvoices, isWithinRange]);
 
   const handleDownloadSaleReport = () => {
     setIsGenerating(true)
@@ -236,7 +321,7 @@ const DashboardPage = ({ onLogout }) => {
       const statsData = [
         [`TyreShop Sales Report - ${activeRangeLabel} View`],
         ['Generated on:', new Date().toLocaleString()],
-        ['Selection:', activeRange === 'daily' ? selectedDate : activeRangeLabel],
+        ['Selection:', activeRangeLabel],
         ['Search Filter:', searchQuery || 'None'],
         [],
         ['Metric', 'Value', 'Status/Trend'],
@@ -258,6 +343,7 @@ const DashboardPage = ({ onLogout }) => {
   const topStats = [
     {
       key: 'sales',
+      category: 'sales',
       icon: <FiTrendingUp className="text-indigo-500" />,
       value: `Rs. ${salesValue.toLocaleString()}`,
       trend: `${salesInvoices.length} Invs | ${creditSales.length} Credits`,
@@ -265,7 +351,35 @@ const DashboardPage = ({ onLogout }) => {
       label: 'Sales (Invoices + Credit)'
     },
     {
+      key: 'cogs',
+      category: 'expenses',
+      icon: <FiShoppingCart className="text-rose-500" />,
+      value: `Rs. ${cogs.toLocaleString()}`,
+      trend: 'Cost of Inventory',
+      trendType: 'warning',
+      label: 'Cost of Goods Sold (COGS)'
+    },
+    {
+      key: 'expenses',
+      category: 'expenses',
+      icon: <FiFileText className="text-amber-500" />,
+      value: `Rs. ${totalGeneralExpenses.toLocaleString()}`,
+      trend: `${expenses.filter(e => isWithinRange(e.expense_date || e.expenseDate || e.created_at)).length} Expense Entries`,
+      trendType: 'warning',
+      label: 'General Expenses'
+    },
+    {
+      key: 'grossProfit',
+      category: 'revenue',
+      icon: <FiPieChart className="text-blue-500" />,
+      value: `Rs. ${grossProfit.toLocaleString()}`,
+      trend: `Margin: ${totalRevenue > 0 ? Math.round((grossProfit / totalRevenue) * 100) : 0}%`,
+      trendType: 'info',
+      label: 'Gross Profit'
+    },
+    {
       key: 'revenue',
+      category: 'revenue',
       icon: <FiDollarSign className="text-emerald-500" />,
       value: `Rs. ${totalRevenue.toLocaleString()}`,
       trend: 'All streams active',
@@ -274,6 +388,7 @@ const DashboardPage = ({ onLogout }) => {
     },
     {
       key: 'netIncome',
+      category: 'netIncome',
       icon: <FiCheckCircle className="text-amber-500" />,
       value: `Rs. ${netIncome.toLocaleString()}`,
       trend: `Costs: Rs. ${totalCosts.toLocaleString()}`,
@@ -282,18 +397,28 @@ const DashboardPage = ({ onLogout }) => {
     },
     {
       key: 'workers',
+      category: 'expenses',
       icon: <FiUser className="text-rose-500" />,
       value: `Rs. ${workerCosts.toLocaleString()}`,
       trend: `P: ${attendanceStats.present} | H: ${attendanceStats.halfDay} | A: ${attendanceStats.absent}`,
       trendType: 'info',
       label: 'Worker Payroll & Attendance'
+    },
+    {
+      key: 'debt',
+      category: 'revenue',
+      icon: <FiLayers className="text-purple-500" />,
+      value: `Rs. ${outstandingDebt.toLocaleString()}`,
+      trend: `${creditSales.filter(cs => isWithinRange(cs.sale_date || cs.created_at || cs.date) && parseFloat(cs.amount) > 0).length} Unpaid Credits`,
+      trendType: outstandingDebt > 0 ? 'warning' : 'info',
+      label: 'Outstanding Debt'
     }
   ]
 
   const visibleStats =
     activeCategory === 'all'
       ? topStats
-      : topStats.filter((card) => card.key === activeCategory)
+      : topStats.filter((card) => (card.category || card.key) === activeCategory)
 
   return (
     <div className="space-y-8">
@@ -314,35 +439,24 @@ const DashboardPage = ({ onLogout }) => {
 
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-3 bg-white p-1 rounded-xl shadow-sm border border-slate-200">
-            <div className="flex p-0.5 bg-slate-50 rounded-lg">
-              {rangeOptions.map((range) => (
-                <button
-                  key={range.key}
-                  onClick={() => setActiveRange(range.key)}
-                  className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${activeRange === range.key
-                    ? 'bg-white text-indigo-600 shadow-sm'
-                    : 'text-slate-400 hover:text-slate-600'
-                    }`}
-                >
-                  {range.label}
-                </button>
-              ))}
-            </div>
-
-            <div className="h-6 w-px bg-slate-200"></div>
-
-            <div className="relative flex items-center gap-2 pr-2">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-lg">
               <FiCalendar className="text-slate-400 text-sm" />
               <input
                 type="date"
-                value={selectedDate}
-                onChange={(e) => {
-                  setSelectedDate(e.target.value)
-                  setActiveRange('daily')
-                }}
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="bg-transparent text-xs font-bold text-slate-700 outline-none cursor-pointer"
+              />
+              <span className="text-slate-400 text-xs font-bold">to</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
                 className="bg-transparent text-xs font-bold text-slate-700 outline-none cursor-pointer"
               />
             </div>
+
+
           </div>
 
           <button
@@ -412,39 +526,42 @@ const DashboardPage = ({ onLogout }) => {
           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-bold text-slate-900">Services & Sales Tracking</h3>
-                <p className="text-sm text-slate-500">Live operational status</p>
+                <h3 className="text-lg font-bold text-slate-900">Recent Sales</h3>
+                <p className="text-sm text-slate-500">Latest sales and credit transactions</p>
               </div>
               <span className="px-3 py-1 bg-indigo-50 text-indigo-600 text-xs font-bold rounded-lg uppercase">
                 {activeRangeLabel}
               </span>
             </div>
             <div className="divide-y divide-slate-50">
-              {filteredServices.length > 0 ? filteredServices.map((row) => (
-                <div key={row.service} className="p-5 flex items-center justify-between hover:bg-slate-50/50 transition-colors group">
+              {recentSales.length > 0 ? recentSales.map((row) => (
+                <div key={row.id} className="p-5 flex items-center justify-between hover:bg-slate-50/50 transition-colors group">
                   <div className="flex items-center gap-4">
                     <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 group-hover:bg-white group-hover:shadow-md transition-all">
-                      <FiTool />
+                      <FiDollarSign />
                     </div>
                     <div>
-                      <p className="font-bold text-slate-800">{row.service}</p>
+                      <p className="font-bold text-slate-800">{row.customer}</p>
                       <p className="text-xs text-slate-500">
-                        <span className="text-indigo-600 font-semibold">{row.count}</span> completed of <span className="font-semibold">{row.target}</span> target
+                        {row.type} &bull; <span className="font-mono text-slate-400">{row.invoiceId}</span>
                       </p>
                     </div>
                   </div>
-                  <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${row.status === 'Ahead' ? 'bg-emerald-100 text-emerald-700' :
-                    row.status === 'Attention' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'
-                    }`}>
-                    {row.status}
+                  <div className="text-right">
+                    <p className="font-bold text-sm text-slate-900">Rs. {row.amount.toLocaleString()}</p>
+                    <div className={`inline-block px-2 py-0.5 mt-1 rounded-full text-[9px] font-bold uppercase tracking-wider ${row.status === 'PAID' || row.status === 'settled' ? 'bg-emerald-100 text-emerald-700' :
+                      row.status === 'UNPAID' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'
+                      }`}>
+                      {row.status}
+                    </div>
                   </div>
                 </div>
               )) : (
-                <div className="p-10 text-center text-slate-400 text-sm font-medium">No matching services found.</div>
+                <div className="p-10 text-center text-slate-400 text-sm font-medium">No recent sales found.</div>
               )}
             </div>
-            <button onClick={() => navigate('/services')} className="w-full p-4 text-sm font-semibold text-indigo-600 hover:bg-indigo-50 transition-colors flex items-center justify-center gap-2 border-t border-slate-100 cursor-pointer">
-              View Full Service Log <FiChevronRight />
+            <button onClick={() => navigate('/credit-sales')} className="w-full p-4 text-sm font-semibold text-indigo-600 hover:bg-indigo-50 transition-colors flex items-center justify-center gap-2 border-t border-slate-100 cursor-pointer">
+              View Full Sales Ledger <FiChevronRight />
             </button>
           </div>
         )}
@@ -612,7 +729,7 @@ const DashboardPage = ({ onLogout }) => {
             </div>
             <div className="p-6 space-y-6">
               {filteredSalary.length > 0 ? filteredSalary.map((row) => {
-                const percent = Math.round((row.paid / row.total) * 100)
+                const percent = row.total > 0 ? Math.round((row.paid / row.total) * 100) : 0;
                 return (
                   <div key={row.team} className="space-y-2">
                     <div className="flex justify-between items-end">
@@ -624,8 +741,8 @@ const DashboardPage = ({ onLogout }) => {
                     </div>
                     <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
                       <div
-                         className="h-full bg-indigo-600 rounded-full transition-all duration-1000 ease-out"
-                         style={{ width: `${percent}%` }}
+                        className="h-full bg-indigo-600 rounded-full transition-all duration-1000 ease-out"
+                        style={{ width: `${percent}%` }}
                       />
                     </div>
                   </div>
@@ -637,11 +754,8 @@ const DashboardPage = ({ onLogout }) => {
             <div className="mt-auto p-4 bg-indigo-600 text-white flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <FiCheckCircle className="text-indigo-200" />
-                <span className="text-xs font-bold uppercase tracking-wider">{workers.length} of {workers.length} salaries released</span>
+                <span className="text-xs font-bold uppercase tracking-wider">{totalPaidWorkers} of {workers.length} salaries released</span>
               </div>
-              <button onClick={() => navigate('/workers-log')} className="text-[10px] font-black uppercase tracking-widest bg-white/20 px-3 py-1.5 rounded hover:bg-white/30 transition-colors cursor-pointer">
-                Details
-              </button>
             </div>
           </div>
         )}

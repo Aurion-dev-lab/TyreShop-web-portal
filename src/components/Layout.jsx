@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
 import {
   FiGrid,
+  FiCalendar,
   FiUsers,
   FiBox,
   FiFileText,
@@ -18,24 +18,20 @@ import {
   FiChevronRight,
   FiSettings
 } from 'react-icons/fi';
+import { useAuth } from '../hooks/useAuth';
 
 const Layout = ({ children }) => {
-  const { logout } = useAuth();
+  const { logoutUser } = useAuth();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
 
   const menuItems = [
     { path: '/dashboard', label: 'Dashboard', icon: <FiGrid /> },
     { path: '/workers', label: 'Workers', icon: <FiUsers /> },
+    { path: '/attendance', label: 'Attendance', icon: <FiCalendar /> },
     { path: '/inventory', label: 'Inventory', icon: <FiBox /> },
-    { path: '/invoices', label: 'Invoices & Billing', icon: <FiFileText /> },
-    { path: '/services', label: 'Services', icon: <FiTool /> },
-    { path: '/credit-sales', label: 'Credit Sales', icon: <FiCreditCard /> },
-    { path: '/tyre-exports', label: 'Tyre Exports', icon: <FiTruck /> },
-    { path: '/expenses', label: 'Expenses', icon: <FiAlertCircle /> },
-    { path: '/salary-management', label: 'Salary Management', icon: <FiDollarSign /> },
-    { path: '/analytics', label: 'Analytics Charts', icon: <FiBarChart2 /> },
-    { path: '/reports', label: 'Reports', icon: <FiFileText /> },
+    { path: '/credit-sales', label: 'Sales', icon: <FiCreditCard /> },
+    { path: '/salary-management', label: 'Salary', icon: <FiDollarSign /> },
   ];
 
   return (
@@ -82,25 +78,6 @@ const Layout = ({ children }) => {
 
         {/* Footer Actions */}
         <div className="p-3 border-t border-slate-800 space-y-2">
-          {/* Quick Actions Button */}
-          {!collapsed ? (
-            <button 
-              onClick={() => navigate('/dashboard')}
-              className="w-full flex items-center justify-center gap-2 py-2.5 bg-emerald-500 hover:bg-emerald-600 active:scale-95 transition-all text-white font-semibold text-xs rounded-xl shadow-lg shadow-emerald-950/10 cursor-pointer"
-            >
-              <FiSettings />
-              <span>Manage Quick Actions</span>
-            </button>
-          ) : (
-            <button 
-              onClick={() => navigate('/dashboard')}
-              className="w-full flex items-center justify-center py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl cursor-pointer"
-              title="Quick Actions"
-            >
-              <FiSettings />
-            </button>
-          )}
-
           {/* Collapse toggle */}
           <button
             onClick={() => setCollapsed(!collapsed)}
@@ -112,7 +89,7 @@ const Layout = ({ children }) => {
 
           {/* Sign Out */}
           <button
-            onClick={logout}
+            onClick={logoutUser}
             className="w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold text-rose-400 hover:text-rose-300 transition-colors cursor-pointer"
           >
             <FiLogOut className="text-base shrink-0" />
@@ -123,26 +100,6 @@ const Layout = ({ children }) => {
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col min-w-0 overflow-y-auto max-h-screen">
-        {/* Sticky Header */}
-        <header className="sticky top-0 z-40 bg-white border-b border-slate-200 h-16 flex items-center justify-between px-6 shrink-0">
-          <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-wider">
-              Web Portal
-            </span>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-3 pl-2 group">
-              <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold">
-                AD
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-slate-700">Admin Portal</p>
-                <p className="text-[10px] text-emerald-500 font-medium uppercase tracking-wider">Online</p>
-              </div>
-            </div>
-          </div>
-        </header>
-
         {/* Dynamic Page Content */}
         <div className="flex-1 p-6 sm:p-8 max-w-7xl w-full mx-auto">
           {children}

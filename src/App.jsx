@@ -8,13 +8,8 @@ import DashboardPage from './pages/DashboardPage'
 import WorkersPage from './pages/WorkersPage'
 import InventoryPage from './pages/InventoryPage'
 import SalaryManagementPage from './pages/SalaryManagementPage'
-import ReportsPage from './pages/ReportsPage'
-import ServiceLog from './pages/ServiceLog'
-import InvoicesPage from './pages/InvoicesPage'
+import AttendancePage from './pages/AttendancePage'
 import CreditSalesPage from './pages/CreditSalesPage'
-import TyreExportsPage from './pages/TyreExportsPage'
-import ExpensesPage from './pages/ExpensesPage'
-import AnalyticsPage from './pages/AnalyticsPage'
 import Layout from './components/Layout'
 
 function App() {
@@ -68,37 +63,16 @@ function App() {
         />
 
         <Route
-          path="/reports"
+          path="/attendance"
           element={
             <ProtectedRoute>
               <Layout>
-                <ReportsPage />
+                <AttendancePage />
               </Layout>
             </ProtectedRoute>
           }
         />
 
-        <Route
-          path="/services"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <ServiceLog />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/invoices"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <InvoicesPage />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
 
         <Route
           path="/credit-sales"
@@ -111,38 +85,6 @@ function App() {
           }
         />
 
-        <Route
-          path="/tyre-exports"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <TyreExportsPage />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/expenses"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <ExpensesPage />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/analytics"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <AnalyticsPage />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
 
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
       </Routes>
